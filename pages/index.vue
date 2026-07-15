@@ -1,5 +1,12 @@
 <template>
   <div class="h-screen flex relative">
+    <!-- Top Alert for copy success -->
+    <TopAlert
+      v-model:visible="copyAlertVisible"
+      type="success"
+      message="复制成功"
+      :duration="2000"
+    />
     <!-- Sidebar -->
     <aside
       :class="['sidebar', { 'sidebar-collapsed': !sidebarOpen }]"
@@ -465,6 +472,9 @@ const renameInput = ref(null);
 // Dialog
 const dialog = useDialog();
 
+// Top Alert
+const copyAlertVisible = ref(false);
+
 // Chat State
 const conversations = ref([]);
 const currentConversationId = ref(null);
@@ -784,7 +794,7 @@ const sendMessage = async () => {
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
-    let assistantMsg = null;
+    let assistantMsgIndex = -1;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -798,18 +808,19 @@ const sendMessage = async () => {
           const data = JSON.parse(line.substring(6));
           if (data.type === 'start') {
             // 收到 start 事件，创建 AI 消息
-            assistantMsg = {
+            messages.value.push({
               id: 'temp-' + Date.now(),
               role: 'assistant',
               content: '',
               created_at: new Date().toISOString(),
-            };
-            messages.value.push(assistantMsg);
-          } else if (data.type === 'chunk' && assistantMsg) {
-            assistantMsg.content += data.content;
+            });
+            assistantMsgIndex = messages.value.length - 1;
+          } else if (data.type === 'chunk' && assistantMsgIndex !== -1) {
+            // 直接修改数组中的对象
+            messages.value[assistantMsgIndex].content += data.content;
             scrollToBottom();
-          } else if (data.type === 'done' && assistantMsg) {
-            assistantMsg.id = data.message_id;
+          } else if (data.type === 'done' && assistantMsgIndex !== -1) {
+            messages.value[assistantMsgIndex].id = data.message_id;
           }
         }
       }
@@ -874,7 +885,7 @@ const stopGeneration = () => {
 const copyMessage = async (content) => {
   try {
     await navigator.clipboard.writeText(content);
-    await dialog.showSuccess('已复制到剪贴板');
+    copyAlertVisible.value = true;
   } catch (err) {
     console.error('Copy error:', err);
     await dialog.showError('复制失败');
@@ -897,11 +908,10 @@ const regenerateMessage = async (messageIndex) => {
     return;
   }
 
-  const userMsg = messages.value[userMsgIndex];
   const aiMsg = messages.value[messageIndex];
 
-  // 调用后端 API 删除该 AI 回复及之后的所有消息
   try {
+    // 调用后端 API 删除该 AI 回复及之后的所有消息
     const res = await fetchAPI(`/api/chat/conversations/${currentConversationId.value}/messages/${aiMsg.id}`, {
       method: 'DELETE',
     });
@@ -915,57 +925,12 @@ const regenerateMessage = async (messageIndex) => {
     // 删除本地消息（从该 AI 回复开始到末尾）
     messages.value.splice(messageIndex);
 
-    // 重新生成 AI 回复
-    isStreaming.value = true;
-    abortController.value = new AbortController();
-
-    const response = await fetchAPI(`/api/chat/conversations/${currentConversationId.value}/messages`, {
-      method: 'POST',
-      body: JSON.stringify({
-        message: userMsg.content,
-        stream: true,
-        model: selectedModel.value,
-      }),
-      signal: abortController.value.signal,
-    });
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let assistantMsg = null;
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      const chunk = decoder.decode(value);
-      const lines = chunk.split('\n');
-
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const eventData = JSON.parse(line.substring(6));
-          if (eventData.type === 'start') {
-            assistantMsg = {
-              id: 'temp-' + Date.now(),
-              role: 'assistant',
-              content: '',
-              created_at: new Date().toISOString(),
-            };
-            messages.value.push(assistantMsg);
-          } else if (eventData.type === 'chunk' && assistantMsg) {
-            assistantMsg.content += eventData.content;
-            scrollToBottom();
-          } else if (eventData.type === 'done' && assistantMsg) {
-            assistantMsg.id = eventData.message_id;
-          }
-        }
-      }
-    }
+    // 使用 generateAIResponse 重新生成（不重复保存用户消息）
+    await generateAIResponse();
 
   } catch (err) {
     console.error('Regenerate error:', err);
     await dialog.showError('重新生成失败');
-  } finally {
-    isStreaming.value = false;
   }
 };
 
@@ -1027,14 +992,7 @@ const saveMessageEdit = async (index) => {
 
     // 如果是用户消息，重新生成 AI 回复
     if (msg.role === 'user') {
-      // 获取历史消息构建上下文
-      const historyMessages = messages.value.slice(0, index + 1).map(m => ({
-        role: m.role,
-        content: m.content
-      }));
-
-      // 发送请求获取新的AI回复
-      await generateAIResponse(historyMessages);
+      await generateAIResponse();
     }
 
   } catch (err) {
@@ -1043,22 +1001,21 @@ const saveMessageEdit = async (index) => {
   }
 };
 
-// 生成AI回复
-const generateAIResponse = async (historyMessages) => {
+// 生成AI回复（不保存用户消息）
+const generateAIResponse = async () => {
   if (!currentConversationId.value) return;
 
   isStreaming.value = true;
 
   try {
-    const response = await fetchAPI(`/api/chat/conversations/${currentConversationId.value}/messages`, {
+    // 使用 /generate 接口，只生成AI回复，不保存用户消息
+    const response = await fetchAPI(`/api/chat/conversations/${currentConversationId.value}/generate`, {
       method: 'POST',
       headers: {
         'Accept': 'text/event-stream',
       },
       body: JSON.stringify({
-        message: historyMessages[historyMessages.length - 1].content,
         stream: true,
-        model: selectedModel.value,
       }),
     });
 
@@ -1068,7 +1025,7 @@ const generateAIResponse = async (historyMessages) => {
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
-    let aiMessage = null;
+    let aiMsgIndex = -1;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -1083,13 +1040,13 @@ const generateAIResponse = async (historyMessages) => {
             const data = JSON.parse(line.slice(6));
 
             if (data.type === 'start') {
-              aiMessage = { id: 'temp-' + Date.now(), role: 'assistant', content: '' };
-              messages.value.push(aiMessage);
-            } else if (data.type === 'chunk' && aiMessage) {
-              aiMessage.content += data.content;
+              messages.value.push({ id: 'temp-' + Date.now(), role: 'assistant', content: '' });
+              aiMsgIndex = messages.value.length - 1;
+            } else if (data.type === 'chunk' && aiMsgIndex !== -1) {
+              messages.value[aiMsgIndex].content += data.content;
               scrollToBottom();
-            } else if (data.type === 'done' && aiMessage) {
-              aiMessage.id = data.message_id;
+            } else if (data.type === 'done' && aiMsgIndex !== -1) {
+              messages.value[aiMsgIndex].id = data.message_id;
             }
           } catch (e) {
             // 忽略解析错误
