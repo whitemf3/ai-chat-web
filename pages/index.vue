@@ -892,14 +892,81 @@ const regenerateMessage = async (messageIndex) => {
     return;
   }
 
-  const userMessage = messages.value[userMsgIndex].content;
+  if (!currentConversationId.value) {
+    await dialog.showError('请先选择对话');
+    return;
+  }
 
-  // 删除当前的 AI 回复
-  messages.value.splice(messageIndex, 1);
+  const userMsg = messages.value[userMsgIndex];
+  const aiMsg = messages.value[messageIndex];
 
-  // 重新发送
-  inputMessage.value = userMessage;
-  await sendMessage();
+  // 调用后端 API 删除该 AI 回复及之后的所有消息
+  try {
+    const res = await fetchAPI(`/api/chat/conversations/${currentConversationId.value}/messages/${aiMsg.id}`, {
+      method: 'DELETE',
+    });
+
+    const data = await res.json();
+    if (!data.success) {
+      await dialog.showError(data.error.message || '重新生成失败');
+      return;
+    }
+
+    // 删除本地消息（从该 AI 回复开始到末尾）
+    messages.value.splice(messageIndex);
+
+    // 重新生成 AI 回复
+    isStreaming.value = true;
+    abortController.value = new AbortController();
+
+    const response = await fetchAPI(`/api/chat/conversations/${currentConversationId.value}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({
+        message: userMsg.content,
+        stream: true,
+        model: selectedModel.value,
+      }),
+      signal: abortController.value.signal,
+    });
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let assistantMsg = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value);
+      const lines = chunk.split('\n');
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const eventData = JSON.parse(line.substring(6));
+          if (eventData.type === 'start') {
+            assistantMsg = {
+              id: 'temp-' + Date.now(),
+              role: 'assistant',
+              content: '',
+              created_at: new Date().toISOString(),
+            };
+            messages.value.push(assistantMsg);
+          } else if (eventData.type === 'chunk' && assistantMsg) {
+            assistantMsg.content += eventData.content;
+            scrollToBottom();
+          } else if (eventData.type === 'done' && assistantMsg) {
+            assistantMsg.id = eventData.message_id;
+          }
+        }
+      }
+    }
+
+  } catch (err) {
+    console.error('Regenerate error:', err);
+    await dialog.showError('重新生成失败');
+  } finally {
+    isStreaming.value = false;
+  }
 };
 
 // 开始编辑消息
@@ -921,7 +988,7 @@ const saveMessageEdit = async (index) => {
     return;
   }
 
-  if (!currentConversation.value) {
+  if (!currentConversationId.value) {
     await dialog.showError('请先选择对话');
     editingMessageIndex.value = null;
     editingContent.value = '';
@@ -933,7 +1000,7 @@ const saveMessageEdit = async (index) => {
 
   // 调用后端API更新消息
   try {
-    const res = await fetchAPI(`/api/chat/conversations/${currentConversation.value}/messages/${msg.id}`, {
+    const res = await fetchAPI(`/api/chat/conversations/${currentConversationId.value}/messages/${msg.id}`, {
       method: 'PUT',
       body: JSON.stringify({ content: newContent }),
     });
@@ -978,12 +1045,12 @@ const saveMessageEdit = async (index) => {
 
 // 生成AI回复
 const generateAIResponse = async (historyMessages) => {
-  if (!currentConversation.value) return;
+  if (!currentConversationId.value) return;
 
   isStreaming.value = true;
 
   try {
-    const response = await fetchAPI(`/api/chat/conversations/${currentConversation.value}/messages`, {
+    const response = await fetchAPI(`/api/chat/conversations/${currentConversationId.value}/messages`, {
       method: 'POST',
       headers: {
         'Accept': 'text/event-stream',
