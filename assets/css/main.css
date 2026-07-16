@@ -87,10 +87,128 @@ body {
 .sidebar-header {
   padding: 8px;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 侧边栏切换按钮 */
+.sidebar-toggle-btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  flex-shrink: 0;
+  color: inherit;
+}
+
+.sidebar-toggle-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.dark .sidebar-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* 三横杠图标容器 */
+.toggle-icon {
+  width: 18px;
+  height: 14px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+/* 每一条横线 */
+.toggle-line {
+  width: 100%;
+  height: 2px;
+  background: currentColor;
+  border-radius: 1px;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+  transform-origin: center;
+  display: block;
+}
+
+/* 侧边栏展开时（.sidebar:not(.sidebar-collapsed)），按钮显示叉号 */
+.sidebar:not(.sidebar-collapsed) .toggle-icon .toggle-line:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+}
+
+.sidebar:not(.sidebar-collapsed) .toggle-icon .toggle-line:nth-child(2) {
+  opacity: 0;
+  transform: scale(0);
+}
+
+.sidebar:not(.sidebar-collapsed) .toggle-icon .toggle-line:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
+}
+
+/* 侧边栏收起时（.sidebar.sidebar-collapsed），按钮显示三横杠（默认状态） */
+.sidebar.sidebar-collapsed .toggle-icon .toggle-line:nth-child(1),
+.sidebar.sidebar-collapsed .toggle-icon .toggle-line:nth-child(2),
+.sidebar.sidebar-collapsed .toggle-icon .toggle-line:nth-child(3) {
+  transform: none;
+  opacity: 1;
+}
+
+/* 侧边栏收起后，屏幕左侧显示的展开按钮 */
+.sidebar-toggle-collapsed {
+  position: fixed;
+  left: 16px;
+  top: 12px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  z-index: 101;
+  color: inherit;
+}
+
+.sidebar-toggle-collapsed:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.dark .sidebar-toggle-collapsed:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-toggle-collapsed .toggle-icon {
+  width: 18px;
+  height: 14px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.sidebar-toggle-collapsed .toggle-line {
+  width: 100%;
+  height: 2px;
+  background: currentColor;
+  border-radius: 1px;
+  display: block;
 }
 
 .sidebar-new-chat {
-  width: 100%;
+  flex: 1;
   padding: 12px;
   background: transparent;
   border: 1px solid rgba(0, 0, 0, 0.15);
@@ -394,6 +512,40 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.top-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 分享按钮 */
+.share-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  cursor: pointer;
+  color: inherit;
+  transition: background 0.2s;
+}
+
+.share-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.dark .share-btn {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.dark .share-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .model-selector {

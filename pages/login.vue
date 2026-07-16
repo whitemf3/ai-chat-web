@@ -1,13 +1,5 @@
 <template>
   <div class="login-page">
-    <!-- Top Alert -->
-    <TopAlert
-      v-model:visible="alertVisible"
-      :type="'warning'"
-      :message="'注册功能未开放，敬请期待'"
-      :duration="3000"
-    />
-
     <div class="login-card">
       <!-- Theme Toggle Button -->
       <button class="login-theme-btn" @click="toggleTheme">
@@ -119,7 +111,6 @@ const config = useRuntimeConfig();
 const isLogin = ref(true);
 const isLoading = ref(false);
 const error = ref('');
-const alertVisible = ref(false);
 const isDark = ref(false);
 
 const form = reactive({
@@ -151,11 +142,6 @@ const toggleTheme = () => {
 const handleRegisterTabClick = () => {
   // 切换到注册表单
   isLogin.value = false;
-
-  // 如果注册关闭，显示警告
-  if (!REGISTRATION_ENABLED) {
-    alertVisible.value = true;
-  }
 };
 
 const handleSubmit = async () => {
@@ -166,16 +152,19 @@ const handleSubmit = async () => {
     // 验证
     if (!isLogin.value && form.password !== form.confirmPassword) {
       error.value = '两次输入的密码不一致';
+      isLoading.value = false;
       return;
     }
 
     if (!isLogin.value && form.password.length < 6) {
       error.value = '密码至少需要 6 位';
+      isLoading.value = false;
       return;
     }
 
     if (!isLogin.value && !form.username.trim()) {
       error.value = '请输入用户名';
+      isLoading.value = false;
       return;
     }
 

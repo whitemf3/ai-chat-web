@@ -7,11 +7,32 @@
       message="复制成功"
       :duration="2000"
     />
+    <!-- 侧边栏收起后的展开按钮 -->
+    <button
+      v-if="!sidebarOpen"
+      class="sidebar-toggle-collapsed"
+      @click="sidebarOpen = true"
+      title="展开侧边栏"
+    >
+      <span class="toggle-icon">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+      </span>
+    </button>
+
     <!-- Sidebar -->
     <aside
       :class="['sidebar', { 'sidebar-collapsed': !sidebarOpen }]"
     >
       <div class="sidebar-header">
+        <button class="sidebar-toggle-btn" @click="sidebarOpen = false" title="收起侧边栏">
+          <span class="toggle-icon">
+            <span class="toggle-line"></span>
+            <span class="toggle-line"></span>
+            <span class="toggle-line"></span>
+          </span>
+        </button>
         <button class="sidebar-new-chat" @click="createNewChat">
           <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -276,9 +297,19 @@
       <!-- Top Bar -->
       <header class="top-bar">
         <div class="top-bar-left">
-          <button class="icon-button" @click="sidebarOpen = !sidebarOpen">
-            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+          <!-- 侧边栏控制按钮已移至侧边栏 -->
+        </div>
+        <div class="top-bar-right">
+          <!-- 分享按钮 -->
+          <button
+            v-if="currentConversationId && messages.length > 0"
+            class="share-btn"
+            @click="shareConversation(currentConversationId)"
+            title="分享对话"
+          >
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V12" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 4l-4.5 4.5M20 4h-5.25M20 4v5.25" />
             </svg>
           </button>
         </div>
@@ -327,7 +358,13 @@
                 ></textarea>
                 <div class="message-edit-actions">
                   <button class="edit-action-btn cancel" @click="cancelMessageEdit">取消</button>
-                  <button class="edit-action-btn save" @click="saveMessageEdit(index)">发送</button>
+                  <button
+                    class="edit-action-btn save"
+                    :disabled="isSavingEdit"
+                    @click="saveMessageEdit(index)"
+                  >
+                    {{ isSavingEdit ? '发送中...' : '发送' }}
+                  </button>
                 </div>
               </div>
               <!-- 正常显示 -->
@@ -363,11 +400,30 @@
                     </svg>
                     <span>复制</span>
                   </button>
-                  <button class="message-action-btn" @click="regenerateMessage(index)" title="重新生成">
+                  <!-- 继续生成按钮（仅在被停止的消息显示） -->
+                  <button
+                    v-if="stoppedMessages.has(msg.id)"
+                    class="message-action-btn continue-btn"
+                    :disabled="isContinuing"
+                    @click="continueGeneration(index)"
+                    title="继续生成"
+                  >
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>{{ isContinuing ? '生成中...' : '继续生成' }}</span>
+                  </button>
+                  <button
+                    class="message-action-btn"
+                    :disabled="isRegenerating"
+                    @click="regenerateMessage(index)"
+                    title="重新生成"
+                  >
                     <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
-                    <span>重新生成</span>
+                    <span>{{ isRegenerating ? '生成中...' : '重新生成' }}</span>
                   </button>
                 </div>
               </div>
@@ -488,6 +544,11 @@ const inputArea = ref(null);
 const abortController = ref(null); // 用于取消请求
 const editingMessageIndex = ref(null); // 编辑消息的索引
 const editingContent = ref(''); // 编辑的内容
+const isSavingEdit = ref(false); // 防止编辑重复提交
+const isRegenerating = ref(false); // 防止重新生成重复点击
+const stoppedMessages = ref(new Set()); // 被停止的消息ID集合
+const currentStreamingMessageId = ref(null); // 当前正在生成的消息ID
+const isContinuing = ref(false); // 是否正在继续生成
 
 // Suggestions
 const suggestions = ref([
@@ -525,7 +586,14 @@ const groupedConversations = computed(() => {
   const weekAgoDate = new Date(todayDate.getTime() - 7 * 24 * 60 * 60 * 1000);
 
   conversations.value.forEach(conv => {
-    const convDate = new Date(conv.updated_at || conv.created_at);
+    // 使用统一的日期解析
+    const dateStr = conv.updated_at || conv.created_at;
+    let convDate;
+    if (dateStr.includes('T')) {
+      convDate = new Date(dateStr);
+    } else {
+      convDate = new Date(dateStr.replace(' ', 'T') + 'Z');
+    }
 
     if (convDate >= todayDate) {
       today.push(conv);
@@ -795,6 +863,7 @@ const sendMessage = async () => {
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let assistantMsgIndex = -1;
+    let tempMessageId = null;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -807,20 +876,24 @@ const sendMessage = async () => {
         if (line.startsWith('data: ')) {
           const data = JSON.parse(line.substring(6));
           if (data.type === 'start') {
-            // 收到 start 事件，创建 AI 消息
+            // 收到 start 事件，创建 AI 消息，使用后端返回的真实ID
+            const realMessageId = data.message_id;
             messages.value.push({
-              id: 'temp-' + Date.now(),
+              id: realMessageId,
               role: 'assistant',
               content: '',
               created_at: new Date().toISOString(),
             });
             assistantMsgIndex = messages.value.length - 1;
+            currentStreamingMessageId.value = realMessageId;
           } else if (data.type === 'chunk' && assistantMsgIndex !== -1) {
             // 直接修改数组中的对象
             messages.value[assistantMsgIndex].content += data.content;
             scrollToBottom();
           } else if (data.type === 'done' && assistantMsgIndex !== -1) {
-            messages.value[assistantMsgIndex].id = data.message_id;
+            // 生成完成，从停止集合中移除
+            stoppedMessages.value.delete(messages.value[assistantMsgIndex].id);
+            currentStreamingMessageId.value = null;
           }
         }
       }
@@ -873,12 +946,101 @@ const sendSuggestion = async (text) => {
 };
 
 // 停止生成
-const stopGeneration = () => {
+const stopGeneration = async () => {
   if (abortController.value) {
     abortController.value.abort();
     abortController.value = null;
   }
+
+  // 保存部分生成的内容并标记为已停止
+  if (currentStreamingMessageId.value && messages.value.length > 0) {
+    const lastMsgIndex = messages.value.length - 1;
+    const lastMsg = messages.value[lastMsgIndex];
+
+    if (lastMsg.role === 'assistant' && lastMsg.content && currentStreamingMessageId.value === lastMsg.id) {
+      try {
+        // 调用后端保存部分内容
+        const res = await fetchAPI(`/api/chat/conversations/${currentConversationId.value}/messages/${currentStreamingMessageId.value}/partial`, {
+          method: 'POST',
+          body: JSON.stringify({ content: lastMsg.content }),
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          // 标记为已停止，显示"继续生成"按钮
+          stoppedMessages.value.add(currentStreamingMessageId.value);
+        }
+      } catch (err) {
+        console.error('Save partial message error:', err);
+      }
+    }
+  }
+
   isStreaming.value = false;
+  currentStreamingMessageId.value = null;
+};
+
+// 继续生成
+const continueGeneration = async (messageIndex) => {
+  if (isContinuing.value) return;
+
+  const msg = messages.value[messageIndex];
+  if (!msg || msg.role !== 'assistant') return;
+
+  isContinuing.value = true;
+
+  try {
+    const response = await fetchAPI(`/api/chat/conversations/${currentConversationId.value}/continue`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'text/event-stream',
+      },
+      body: JSON.stringify({
+        message_id: msg.id,
+        existing_content: msg.content,
+        stream: true,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('请求失败');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value);
+      const lines = chunk.split('\n');
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6));
+
+            if (data.type === 'chunk') {
+              messages.value[messageIndex].content += data.content;
+              scrollToBottom();
+            } else if (data.type === 'done') {
+              // 从停止集合中移除
+              stoppedMessages.value.delete(msg.id);
+            }
+          } catch (e) {
+            // 忽略解析错误
+          }
+        }
+      }
+    }
+
+  } catch (err) {
+    console.error('Continue generation error:', err);
+    await dialog.showError('继续生成失败');
+  } finally {
+    isContinuing.value = false;
+  }
 };
 
 // 复制消息
@@ -894,7 +1056,8 @@ const copyMessage = async (content) => {
 
 // 重新生成
 const regenerateMessage = async (messageIndex) => {
-  if (isStreaming.value) return;
+  // 防止重复点击
+  if (isStreaming.value || isRegenerating.value) return;
 
   // 找到用户消息（AI 回复的前一条）
   const userMsgIndex = messageIndex - 1;
@@ -908,6 +1071,8 @@ const regenerateMessage = async (messageIndex) => {
     return;
   }
 
+  isRegenerating.value = true;
+
   const aiMsg = messages.value[messageIndex];
 
   try {
@@ -919,6 +1084,7 @@ const regenerateMessage = async (messageIndex) => {
     const data = await res.json();
     if (!data.success) {
       await dialog.showError(data.error.message || '重新生成失败');
+      isRegenerating.value = false;
       return;
     }
 
@@ -931,6 +1097,8 @@ const regenerateMessage = async (messageIndex) => {
   } catch (err) {
     console.error('Regenerate error:', err);
     await dialog.showError('重新生成失败');
+  } finally {
+    isRegenerating.value = false;
   }
 };
 
@@ -948,6 +1116,9 @@ const cancelMessageEdit = () => {
 
 // 保存消息编辑（发送编辑后的消息）
 const saveMessageEdit = async (index) => {
+  // 防止重复点击
+  if (isSavingEdit.value) return;
+
   if (!editingContent.value.trim()) {
     await dialog.showError('消息内容不能为空');
     return;
@@ -959,6 +1130,8 @@ const saveMessageEdit = async (index) => {
     editingContent.value = '';
     return;
   }
+
+  isSavingEdit.value = true;
 
   const msg = messages.value[index];
   const newContent = editingContent.value.trim();
@@ -974,6 +1147,7 @@ const saveMessageEdit = async (index) => {
 
     if (!data.success) {
       await dialog.showError(data.error.message || '编辑失败');
+      isSavingEdit.value = false;
       return;
     }
 
@@ -998,6 +1172,8 @@ const saveMessageEdit = async (index) => {
   } catch (err) {
     console.error('Edit message error:', err);
     await dialog.showError('编辑失败，请重试');
+  } finally {
+    isSavingEdit.value = false;
   }
 };
 
@@ -1040,13 +1216,18 @@ const generateAIResponse = async () => {
             const data = JSON.parse(line.slice(6));
 
             if (data.type === 'start') {
-              messages.value.push({ id: 'temp-' + Date.now(), role: 'assistant', content: '' });
+              // 使用后端返回的真实消息ID
+              const realMessageId = data.message_id;
+              messages.value.push({ id: realMessageId, role: 'assistant', content: '' });
               aiMsgIndex = messages.value.length - 1;
+              currentStreamingMessageId.value = realMessageId;
             } else if (data.type === 'chunk' && aiMsgIndex !== -1) {
               messages.value[aiMsgIndex].content += data.content;
               scrollToBottom();
             } else if (data.type === 'done' && aiMsgIndex !== -1) {
-              messages.value[aiMsgIndex].id = data.message_id;
+              // 生成完成，从停止集合中移除
+              stoppedMessages.value.delete(messages.value[aiMsgIndex].id);
+              currentStreamingMessageId.value = null;
             }
           } catch (e) {
             // 忽略解析错误
@@ -1282,5 +1463,28 @@ const adjustHeight = () => {
 @keyframes bounce {
   0%, 80%, 100% { transform: scale(0); }
   40% { transform: scale(1); }
+}
+
+/* 编辑按钮禁用状态 */
+.edit-action-btn.save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 重新生成按钮禁用状态 */
+.message-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 继续生成按钮特殊样式 */
+.message-action-btn.continue-btn {
+  color: #10a37f;
+  border-color: rgba(16, 163, 127, 0.3);
+}
+
+.message-action-btn.continue-btn:hover:not(:disabled) {
+  background: rgba(16, 163, 127, 0.1);
+  border-color: rgba(16, 163, 127, 0.5);
 }
 </style>

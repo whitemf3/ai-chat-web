@@ -48,6 +48,7 @@
 <script setup>
 import MarkdownIt from 'markdown-it';
 import hljs from 'highlight.js';
+import { formatShort } from '~/utils/date';
 
 // 使用空白布局，不显示默认的导航栏
 definePageMeta({
@@ -76,17 +77,8 @@ const md = new MarkdownIt({
 
 const renderMarkdown = (content) => md.render(content);
 
-// 格式化时间
-const formatTime = (time) => {
-  if (!time) return '';
-  const date = new Date(time);
-  return date.toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
+// 使用统一的日期格式化函数
+const formatTime = formatShort;
 
 // 跳转首页
 const goHome = () => {
