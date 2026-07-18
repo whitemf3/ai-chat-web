@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <Transition name="alert">
-      <div v-if="visible" :class="['top-alert', type]">
+      <div v-if="visible" :key="alertKey" :class="['top-alert', type]">
         <div class="alert-content">
           <span class="alert-icon">
             <svg v-if="type === 'warning'" width="20" height="20" fill="currentColor" viewBox="0 0 20 20">
@@ -37,7 +37,7 @@ const props = defineProps({
   },
   type: {
     type: String,
-    default: 'warning', // warning, error, success, info
+    default: 'warning',
   },
   message: {
     type: String,
@@ -45,7 +45,11 @@ const props = defineProps({
   },
   duration: {
     type: Number,
-    default: 3000, // 自动关闭时间，0 表示不自动关闭
+    default: 3000,
+  },
+  alertKey: {
+    type: Number,
+    default: 0,
   },
 });
 

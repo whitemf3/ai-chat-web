@@ -6,6 +6,7 @@
       type="success"
       message="复制成功"
       :duration="2000"
+      :alert-key="copyAlertKey"
     />
     <!-- 侧边栏收起后的展开按钮 -->
     <button
@@ -85,7 +86,7 @@
                 </div>
                 <div class="conversation-menu-item delete" @click="deleteConversation(conv.id)">
                   <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M3 19h18" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z" />
                   </svg>
                   <span>删除</span>
                 </div>
@@ -131,7 +132,7 @@
                 </div>
                 <div class="conversation-menu-item delete" @click="deleteConversation(conv.id)">
                   <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M3 19h18" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z" />
                   </svg>
                   <span>删除</span>
                 </div>
@@ -177,7 +178,7 @@
                 </div>
                 <div class="conversation-menu-item delete" @click="deleteConversation(conv.id)">
                   <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M3 19h18" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z" />
                   </svg>
                   <span>删除</span>
                 </div>
@@ -223,7 +224,7 @@
                 </div>
                 <div class="conversation-menu-item delete" @click="deleteConversation(conv.id)">
                   <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M3 19h18" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z" />
                   </svg>
                   <span>删除</span>
                 </div>
@@ -253,13 +254,7 @@
       </div>
 
       <div class="sidebar-footer">
-        <!-- Theme Toggle -->
-        <button class="sidebar-theme-btn" @click="toggleTheme">
-          <span v-if="isDark">🌙</span>
-          <span v-else>☀️</span>
-        </button>
-
-        <div class="sidebar-user" @click="showUserMenu = !showUserMenu">
+        <div class="sidebar-user">
           <div class="user-avatar">
             {{ (user?.username || '用户').charAt(0).toUpperCase() }}
           </div>
@@ -267,19 +262,182 @@
             <div class="user-name">{{ user?.username || '用户' }}</div>
             <div class="user-email">{{ user?.email || '' }}</div>
           </div>
-          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="flex-shrink: 0;">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-          </svg>
+          <button class="user-menu-btn" @click="showUserMenu = !showUserMenu" title="更多选项">
+            <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+            </svg>
+          </button>
         </div>
 
         <!-- User Menu Popup -->
         <div v-if="showUserMenu" class="user-menu-overlay" @click="showUserMenu = false"></div>
         <div v-if="showUserMenu" class="user-menu" @click.stop>
+          <div class="menu-item" @click="openAccountModal">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            <span>账号管理</span>
+          </div>
+          <div class="menu-item" @click="openSettingsModal">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span>通用设置</span>
+          </div>
+          <div class="menu-divider"></div>
           <div class="menu-item logout" @click="logout">
             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
             <span>退出登录</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Account Management Modal -->
+      <div
+        v-if="showAccountModal"
+        class="account-modal-overlay"
+        @mousedown="handleOverlayMouseDown"
+        @mouseup="handleOverlayMouseUp"
+      >
+        <div class="account-modal" @click.stop>
+          <div class="account-modal-header">
+            <h3>账号管理</h3>
+            <button class="account-modal-close" @click="closeAccountModal">
+              <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div class="account-modal-body">
+            <!-- 修改昵称 -->
+            <div class="account-section">
+              <h4>修改昵称</h4>
+              <div class="account-form">
+                <input
+                  v-model="newUsername"
+                  type="text"
+                  class="account-input"
+                  placeholder="新昵称"
+                />
+                <button
+                  class="account-btn"
+                  :disabled="!newUsername.trim() || newUsername === user?.username"
+                  @click="updateUsername"
+                >
+                  保存
+                </button>
+              </div>
+            </div>
+
+            <!-- 修改密码 -->
+            <div class="account-section">
+              <h4>修改密码</h4>
+              <div class="account-form">
+                <input
+                  v-model="oldPassword"
+                  type="password"
+                  class="account-input"
+                  placeholder="原密码"
+                />
+                <input
+                  v-model="newPassword"
+                  type="password"
+                  class="account-input"
+                  placeholder="新密码"
+                />
+                <input
+                  v-model="confirmPassword"
+                  type="password"
+                  class="account-input"
+                  placeholder="确认新密码"
+                />
+                <button
+                  class="account-btn"
+                  :disabled="!oldPassword || !newPassword || newPassword !== confirmPassword"
+                  @click="updatePassword"
+                >
+                  修改密码
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings Modal -->
+      <div
+        v-if="showSettingsModal"
+        class="account-modal-overlay"
+        @mousedown="handleOverlayMouseDown"
+        @mouseup="handleOverlayMouseUp"
+      >
+        <div class="account-modal" @click.stop>
+          <div class="account-modal-header">
+            <h3>通用设置</h3>
+            <button class="account-modal-close" @click="closeSettingsModal">
+              <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div class="account-modal-body">
+            <!-- 主题设置 -->
+            <div class="account-section">
+              <h4>主题</h4>
+              <div class="settings-options">
+                <button
+                  :class="['settings-option', { active: userSettings.theme === 'light' }]"
+                  @click="updateTheme('light')"
+                >
+                  <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                  </svg>
+                  <span>浅色</span>
+                </button>
+                <button
+                  :class="['settings-option', { active: userSettings.theme === 'dark' }]"
+                  @click="updateTheme('dark')"
+                >
+                  <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 5.646 9.003 9.003 0 0012 21a9.003 9.003 0 01-8.354-5.646z" />
+                  </svg>
+                  <span>深色</span>
+                </button>
+                <button
+                  :class="['settings-option', { active: userSettings.theme === 'auto' }]"
+                  @click="updateTheme('auto')"
+                >
+                  <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  <span>跟随系统</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 语言设置 -->
+            <div class="account-section">
+              <h4>语言</h4>
+              <div class="settings-options">
+                <button
+                  :class="['settings-option', { active: userSettings.language === 'zh' }]"
+                  @click="updateLanguage('zh')"
+                >
+                  <span>🇨🇳</span>
+                  <span>简体中文</span>
+                </button>
+                <button
+                  :class="['settings-option', { active: userSettings.language === 'en' }]"
+                  @click="updateLanguage('en')"
+                >
+                  <span>🇺🇸</span>
+                  <span>English</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -307,10 +465,10 @@
             @click="shareConversation(currentConversationId)"
             title="分享对话"
           >
-            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V12" />
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 4l-4.5 4.5M20 4h-5.25M20 4v5.25" />
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
             </svg>
+            <span>分享</span>
           </button>
         </div>
       </header>
@@ -435,55 +593,158 @@
       <!-- Input Area -->
       <div class="input-area">
         <div class="input-wrapper">
-          <!-- Model Selector in Input -->
-          <div style="display: flex; gap: 12px; margin-bottom: 12px;">
-            <select v-model="selectedModel" class="model-selector" style="flex: 1;">
-              <optgroup label="推荐模型">
-                <option v-for="model in recommendedModels" :key="model.id" :value="model.id">
-                  {{ model.name }}
-                </option>
-              </optgroup>
-              <optgroup label="其他模型">
-                <option v-for="model in otherModels" :key="model.id" :value="model.id">
-                  {{ model.name }}
-                </option>
-              </optgroup>
-            </select>
+          <!-- 文件预览区 -->
+          <div v-if="uploadedFiles.length > 0" class="file-preview-area">
+            <div v-for="(file, index) in uploadedFiles" :key="index" class="file-preview-item">
+              <img v-if="file.type === 'image'" :src="file.url" class="file-preview-image" />
+              <div v-else class="file-preview-document">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>{{ file.name }}</span>
+              </div>
+              <button class="file-remove-btn" @click="removeFile(index)" title="移除">
+                <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
 
-          <div class="input-container">
-            <textarea
-              ref="inputArea"
-              v-model="inputMessage"
-              @keydown.enter.exact.prevent="sendMessage"
-              @input="adjustHeight"
-              placeholder="发送消息..."
-              rows="1"
-              class="input-textarea"
-            ></textarea>
-            <!-- 停止生成按钮 -->
-            <button
-              v-if="isStreaming"
-              @click="stopGeneration"
-              class="stop-button"
-              title="停止生成"
-            >
-              <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
-                <rect x="6" y="6" width="12" height="12" rx="2" />
-              </svg>
-            </button>
-            <!-- 发送按钮 -->
-            <button
-              v-else
-              @click="sendMessage"
-              :disabled="!inputMessage.trim()"
-              class="send-button"
-            >
-              <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-              </svg>
-            </button>
+          <!-- 输入框主体 -->
+          <div class="input-main">
+            <!-- 左侧按钮组 -->
+            <div class="input-left-btns">
+              <!-- 文件上传按钮 -->
+              <button class="input-action-btn" @click="triggerFileUpload" :disabled="isUploading" title="上传文件">
+                <svg v-if="!isUploading" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                <svg v-else width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" class="spinner">
+                  <circle cx="12" cy="12" r="10" stroke-width="2" stroke-dasharray="31.4" stroke-dashoffset="10" />
+                </svg>
+              </button>
+              <input ref="fileInput" type="file" accept="image/*,.pdf,.txt,.md" multiple style="display: none" @change="handleFileUpload" />
+            </div>
+
+            <!-- 输入框 -->
+            <div class="input-field-wrapper">
+              <textarea
+                ref="inputArea"
+                v-model="inputMessage"
+                @keydown.enter.exact.prevent="sendMessage"
+                @input="adjustHeight"
+                placeholder="输入消息..."
+                rows="1"
+                class="input-textarea"
+              ></textarea>
+            </div>
+
+            <!-- 右侧按钮组 -->
+            <div class="input-right-btns">
+              <!-- 深度思考按钮 -->
+              <button
+                :class="['input-action-btn', { active: deepThink }]"
+                @click="deepThink = !deepThink"
+                title="深度思考模式"
+              >
+                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.95-.376-1.862-1.057-2.528l-.548-.547z" />
+                </svg>
+              </button>
+
+              <!-- 工作流选择 -->
+              <div class="workflow-selector">
+                <button
+                  :class="['input-action-btn', { active: selectedWorkflow }]"
+                  @click="showWorkflowMenu = !showWorkflowMenu"
+                  title="选择AI工作流"
+                >
+                  <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+
+                <!-- 工作流下拉菜单 -->
+                <Transition name="workflow-menu">
+                  <div v-if="showWorkflowMenu" class="workflow-menu">
+                    <div class="workflow-menu-header">
+                      <span>选择处理方式</span>
+                    </div>
+                    <div class="workflow-menu-list">
+                      <div
+                        class="workflow-option"
+                        :class="{ active: !selectedWorkflow }"
+                        @click="selectWorkflow(null)"
+                      >
+                        <div class="workflow-icon">🎯</div>
+                        <div class="workflow-info">
+                          <span class="workflow-name">自动选择</span>
+                          <span class="workflow-desc">根据规则智能匹配</span>
+                        </div>
+                        <svg v-if="!selectedWorkflow" width="16" height="16" fill="#007aff" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                        </svg>
+                      </div>
+                      <div
+                        v-for="workflow in workflows"
+                        :key="workflow.id"
+                        class="workflow-option"
+                        :class="{ active: selectedWorkflow?.id === workflow.id }"
+                        @click="selectWorkflow(workflow)"
+                      >
+                        <div class="workflow-icon">🔄</div>
+                        <div class="workflow-info">
+                          <span class="workflow-name">{{ workflow.name }}</span>
+                          <span class="workflow-desc">{{ workflow.description || `${workflow.step_count} 个步骤` }}</span>
+                        </div>
+                        <svg v-if="selectedWorkflow?.id === workflow.id" width="16" height="16" fill="#007aff" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                </Transition>
+              </div>
+
+              <!-- 发送/停止按钮 -->
+              <button
+                v-if="isStreaming"
+                @click="stopGeneration"
+                class="send-btn stop"
+                title="停止生成"
+              >
+                <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24">
+                  <rect x="6" y="6" width="12" height="12" rx="2" />
+                </svg>
+              </button>
+              <button
+                v-else
+                @click="sendMessage"
+                :disabled="!inputMessage.trim() && uploadedFiles.length === 0"
+                class="send-btn"
+                title="发送"
+              >
+                <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                </svg>
+              </button>
+            </div>
           </div>
+
+          <!-- 模式提示 -->
+          <Transition name="mode-hint">
+            <div v-if="deepThink || selectedWorkflow" class="mode-hints">
+              <span v-if="deepThink" class="mode-hint">
+                <span class="hint-dot"></span>
+                深度思考
+              </span>
+              <span v-if="selectedWorkflow" class="mode-hint workflow">
+                <span class="hint-dot"></span>
+                {{ selectedWorkflow.name }}
+              </span>
+            </div>
+          </Transition>
         </div>
       </div>
     </main>
@@ -530,25 +791,50 @@ const dialog = useDialog();
 
 // Top Alert
 const copyAlertVisible = ref(false);
+const copyAlertKey = ref(0);
 
 // Chat State
 const conversations = ref([]);
 const currentConversationId = ref(null);
 const messages = ref([]);
-const models = ref([]);
-const selectedModel = ref('@cf/meta/llama-3.2-3b-instruct');
 const inputMessage = ref('');
 const isStreaming = ref(false);
 const messagesContainer = ref(null);
 const inputArea = ref(null);
-const abortController = ref(null); // 用于取消请求
-const editingMessageIndex = ref(null); // 编辑消息的索引
-const editingContent = ref(''); // 编辑的内容
-const isSavingEdit = ref(false); // 防止编辑重复提交
-const isRegenerating = ref(false); // 防止重新生成重复点击
-const stoppedMessages = ref(new Set()); // 被停止的消息ID集合
-const currentStreamingMessageId = ref(null); // 当前正在生成的消息ID
-const isContinuing = ref(false); // 是否正在继续生成
+const abortController = ref(null);
+const editingMessageIndex = ref(null);
+const editingContent = ref('');
+const isSavingEdit = ref(false);
+const isRegenerating = ref(false);
+const stoppedMessages = ref(new Set());
+const currentStreamingMessageId = ref(null);
+const isContinuing = ref(false);
+
+// Deep Think & File Upload
+const deepThink = ref(false);
+const uploadedFiles = ref([]);
+const isUploading = ref(false);
+const fileInput = ref(null);
+
+// Workflow
+const workflows = ref([]);
+const selectedWorkflow = ref(null);
+const showWorkflowMenu = ref(false);
+
+// Account Management
+const showAccountModal = ref(false);
+const newUsername = ref('');
+const oldPassword = ref('');
+const newPassword = ref('');
+const confirmPassword = ref('');
+
+// Settings
+const showSettingsModal = ref(false);
+const userSettings = ref({
+  theme: 'auto',
+  language: 'zh',
+});
+const overlayMouseDownTarget = ref(null);
 
 // Suggestions
 const suggestions = ref([
@@ -571,9 +857,6 @@ const md = new MarkdownIt({
 const renderMarkdown = (content) => md.render(content);
 
 // Computed
-const recommendedModels = computed(() => models.value.filter(m => m.id.includes('llama-3.2-3b') || m.id.includes('qwen-2.5')));
-const otherModels = computed(() => models.value.filter(m => !m.id.includes('llama-3.2-3b') && !m.id.includes('qwen-2.5')));
-
 const groupedConversations = computed(() => {
   const today = [];
   const yesterday = [];
@@ -642,10 +925,14 @@ onMounted(() => {
     if (showConversationMenu.value && !e.target.closest('.conversation-menu') && !e.target.closest('.conversation-menu-btn')) {
       showConversationMenu.value = null;
     }
+    // 关闭工作流菜单
+    if (showWorkflowMenu.value && !e.target.closest('.workflow-selector')) {
+      showWorkflowMenu.value = false;
+    }
   });
 
-  loadModels();
   loadConversations();
+  loadWorkflows();
 });
 
 // API Methods
@@ -655,17 +942,36 @@ const fetchAPI = async (endpoint, options = {}) => {
     'Content-Type': 'application/json',
     ...(token.value && { Authorization: `Bearer ${token.value}` }),
   };
-  return fetch(url, { ...options, headers: { ...headers, ...options.headers } }, options.signal ? { signal: options.signal } : {});
+  const res = await fetch(url, { ...options, headers: { ...headers, ...options.headers } }, options.signal ? { signal: options.signal } : {});
+
+  // 检查 401 未授权响应，立即跳转登录页
+  if (res.status === 401) {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_user');
+    navigateTo('/login');
+    throw new Error('Unauthorized');
+  }
+
+  return res;
 };
 
-const loadModels = async () => {
+// 加载可用工作流
+const loadWorkflows = async () => {
   try {
-    const res = await fetchAPI('/api/models');
+    const res = await fetchAPI('/api/workflows');
     const data = await res.json();
-    if (data.success) models.value = data.data;
+    if (data.success) {
+      workflows.value = data.data || [];
+    }
   } catch (err) {
-    console.error('Load models error:', err);
+    console.error('Load workflows error:', err);
   }
+};
+
+// 选择工作流
+const selectWorkflow = (workflow) => {
+  selectedWorkflow.value = workflow;
+  showWorkflowMenu.value = false;
 };
 
 const loadConversations = async () => {
@@ -824,8 +1130,69 @@ const cancelRename = () => {
   renameTitle.value = '';
 };
 
+// ============================================
+// 文件上传
+// ============================================
+const triggerFileUpload = () => {
+  fileInput.value?.click();
+};
+
+const handleFileUpload = async (e) => {
+  const files = e.target.files;
+  if (!files || files.length === 0) return;
+
+  isUploading.value = true;
+
+  for (const file of files) {
+    // 检查文件大小 (最大 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      dialog.showError(`文件 ${file.name} 超过 10MB 限制`);
+      continue;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch(`${config.public.apiBase}/api/files/upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token.value}`,
+        },
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        const isImage = file.type.startsWith('image/');
+        uploadedFiles.value.push({
+          id: data.data.id,
+          name: data.data.filename,
+          url: data.data.url,
+          type: isImage ? 'image' : 'document',
+          size: data.data.size,
+        });
+      } else {
+        dialog.showError(`上传 ${file.name} 失败`);
+      }
+    } catch (err) {
+      console.error('Upload error:', err);
+      dialog.showError(`上传 ${file.name} 失败`);
+    }
+  }
+
+  isUploading.value = false;
+  // 清空 input，允许重复选择同一文件
+  if (fileInput.value) fileInput.value.value = '';
+};
+
+const removeFile = (index) => {
+  uploadedFiles.value.splice(index, 1);
+};
+
 const sendMessage = async () => {
-  if (!inputMessage.value.trim() || isStreaming.value) return;
+  if ((!inputMessage.value.trim() && uploadedFiles.value.length === 0) || isStreaming.value) return;
 
   // 如果没有当前对话，先创建一个
   if (!currentConversationId.value) {
@@ -836,11 +1203,22 @@ const sendMessage = async () => {
   inputMessage.value = '';
   if (inputArea.value) inputArea.value.style.height = 'auto';
 
+  // 准备附件
+  const attachments = uploadedFiles.value.map(f => ({
+    type: f.type,
+    url: f.url,
+    name: f.name,
+  }));
+
+  // 清空已上传文件
+  uploadedFiles.value = [];
+
   messages.value.push({
     id: Date.now(),
     role: 'user',
     content: userMessage,
     created_at: new Date().toISOString(),
+    attachments: attachments.length > 0 ? attachments : undefined,
   });
 
   scrollToBottom();
@@ -855,7 +1233,9 @@ const sendMessage = async () => {
       body: JSON.stringify({
         message: userMessage,
         stream: true,
-        model: selectedModel.value,
+        deep_think: deepThink.value,
+        attachments: attachments,
+        workflow_id: selectedWorkflow.value?.id || null,
       }),
       signal: abortController.value.signal,
     });
@@ -1047,6 +1427,14 @@ const continueGeneration = async (messageIndex) => {
 const copyMessage = async (content) => {
   try {
     await navigator.clipboard.writeText(content);
+    // 先关闭旧弹窗
+    if (copyAlertVisible.value) {
+      copyAlertVisible.value = false;
+      await nextTick();
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    // 显示新弹窗
+    copyAlertKey.value++;
     copyAlertVisible.value = true;
   } catch (err) {
     console.error('Copy error:', err);
@@ -1283,6 +1671,190 @@ const toggleTheme = () => {
   localStorage.setItem('theme', isDark.value ? 'dark' : 'light');
 };
 
+// ============================================
+// 账号管理
+// ============================================
+const openAccountModal = () => {
+  showUserMenu.value = false;
+  newUsername.value = user.value?.username || '';
+  oldPassword.value = '';
+  newPassword.value = '';
+  confirmPassword.value = '';
+  showAccountModal.value = true;
+};
+
+const closeAccountModal = () => {
+  showAccountModal.value = false;
+};
+
+// 处理弹窗外点击关闭（防止拖动选择文本时误触发）
+const handleOverlayMouseDown = (e) => {
+  // 记录鼠标按下时的目标
+  overlayMouseDownTarget.value = e.target;
+};
+
+const handleOverlayMouseUp = (e) => {
+  // 只有当鼠标按下和松开都在 overlay 上时才关闭
+  if (overlayMouseDownTarget.value === e.target && e.target.classList.contains('account-modal-overlay')) {
+    closeAccountModal();
+    closeSettingsModal();
+  }
+  overlayMouseDownTarget.value = null;
+};
+
+// ============================================
+// 通用设置
+// ============================================
+const openSettingsModal = async () => {
+  showUserMenu.value = false;
+  // 加载用户设置
+  await loadUserSettings();
+  showSettingsModal.value = true;
+};
+
+const closeSettingsModal = () => {
+  showSettingsModal.value = false;
+};
+
+const loadUserSettings = async () => {
+  try {
+    const res = await fetchAPI('/api/user/settings');
+    const response = await res.json();
+    if (response.success && response.data) {
+      userSettings.value = {
+        theme: response.data.theme || 'auto',
+        language: response.data.language || 'zh',
+      };
+      // 应用主题
+      applyTheme(userSettings.value.theme);
+    }
+  } catch (error) {
+    console.error('Load settings error:', error);
+  }
+};
+
+const applyTheme = (theme) => {
+  if (theme === 'dark') {
+    isDark.value = true;
+    document.documentElement.classList.add('dark');
+  } else if (theme === 'light') {
+    isDark.value = false;
+    document.documentElement.classList.remove('dark');
+  } else {
+    // auto - 跟随系统
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    isDark.value = prefersDark;
+    document.documentElement.classList.toggle('dark', prefersDark);
+  }
+};
+
+const updateTheme = async (theme) => {
+  userSettings.value.theme = theme;
+  applyTheme(theme);
+  await saveUserSettings();
+};
+
+const updateLanguage = async (language) => {
+  userSettings.value.language = language;
+  await saveUserSettings();
+};
+
+const saveUserSettings = async () => {
+  try {
+    const res = await fetchAPI('/api/user/settings', {
+      method: 'PUT',
+      body: JSON.stringify({
+        theme: userSettings.value.theme,
+        language: userSettings.value.language,
+        default_model: selectedModel.value,
+      }),
+    });
+    const response = await res.json();
+    if (!response.success) {
+      dialog.showError('保存设置失败');
+    }
+  } catch (error) {
+    console.error('Save settings error:', error);
+    dialog.showError('保存设置失败');
+  }
+};
+
+const updateUsername = async () => {
+  if (!newUsername.value.trim()) {
+    dialog.showError('请输入昵称');
+    return;
+  }
+
+  if (newUsername.value === user.value?.username) {
+    dialog.showError('昵称未改变');
+    return;
+  }
+
+  try {
+    const res = await fetchAPI('/api/user/profile', {
+      method: 'PUT',
+      body: JSON.stringify({
+        username: newUsername.value.trim(),
+      }),
+    });
+    const response = await res.json();
+    if (response.success) {
+      user.value.username = newUsername.value.trim();
+      localStorage.setItem('auth_user', JSON.stringify(user.value));
+      dialog.showSuccess('昵称修改成功');
+    } else {
+      dialog.showError(response?.error?.message || '修改失败');
+    }
+  } catch (error) {
+    console.error('Update username error:', error);
+    dialog.showError('修改失败');
+  }
+};
+
+const updatePassword = async () => {
+  if (!oldPassword.value) {
+    dialog.showError('请输入原密码');
+    return;
+  }
+
+  if (!newPassword.value) {
+    dialog.showError('请输入新密码');
+    return;
+  }
+
+  if (newPassword.value.length < 6) {
+    dialog.showError('新密码至少6位');
+    return;
+  }
+
+  if (newPassword.value !== confirmPassword.value) {
+    dialog.showError('两次密码不一致');
+    return;
+  }
+
+  try {
+    const res = await fetchAPI('/api/user/password', {
+      method: 'PUT',
+      body: JSON.stringify({
+        oldPassword: oldPassword.value,
+        newPassword: newPassword.value,
+      }),
+    });
+    const response = await res.json();
+    if (response.success) {
+      oldPassword.value = '';
+      newPassword.value = '';
+      confirmPassword.value = '';
+      dialog.showSuccess('密码修改成功');
+    } else {
+      dialog.showError(response?.error?.message || '修改失败');
+    }
+  } catch (error) {
+    console.error('Update password error:', error);
+    dialog.showError('修改失败');
+  }
+};
+
 const logout = async () => {
   showUserMenu.value = false;
   const confirmed = await dialog.showConfirm('确定要退出登录吗？');
@@ -1322,19 +1894,67 @@ const adjustHeight = () => {
 .user-menu {
   position: absolute;
   bottom: calc(100% + 8px);
-  left: 12px;
   right: 12px;
+  left: auto;
   background: #ffffff;
-  border-radius: 8px;
+  border-radius: 10px;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(0, 0, 0, 0.06);
   z-index: 1001;
+  min-width: 120px;
+  padding: 4px 0;
 }
 
 .dark .user-menu {
   background: #2a2b32;
-  border-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.user-menu .menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: #1a1a1a;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.user-menu .menu-item:hover {
+  background: #f5f5f7;
+}
+
+.dark .user-menu .menu-item {
+  color: #ffffff;
+}
+
+.dark .user-menu .menu-item:hover {
+  background: #3a3b41;
+}
+
+.user-menu .menu-item.logout {
+  color: #ff3b30;
+}
+
+.dark .user-menu .menu-item.logout {
+  color: #ff6b6b;
+}
+
+.user-menu .menu-item svg {
+  flex-shrink: 0;
+}
+
+.user-menu .menu-divider {
+  height: 1px;
+  background: #e5e5e5;
+  margin: 4px 0;
+}
+
+.dark .user-menu .menu-divider {
+  background: #3a3b41;
 }
 
 .rename-dialog-overlay {
@@ -1410,6 +2030,247 @@ const adjustHeight = () => {
   color: #6e6e80;
 }
 
+/* Account Modal Styles */
+.account-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.account-modal {
+  background: #ffffff;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 420px;
+  max-height: 80vh;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.dark .account-modal {
+  background: #2a2b32;
+}
+
+.account-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.dark .account-modal-header {
+  border-bottom-color: #3a3b41;
+}
+
+.account-modal-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.dark .account-modal-header h3 {
+  color: #ffffff;
+}
+
+.account-modal-close {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: #6e6e80;
+  transition: background 0.2s;
+}
+
+.account-modal-close:hover {
+  background: #f4f4f4;
+}
+
+.dark .account-modal-close:hover {
+  background: #3a3b41;
+}
+
+.account-modal-body {
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.account-section {
+  margin-bottom: 28px;
+}
+
+.account-section:last-child {
+  margin-bottom: 0;
+}
+
+.account-section h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #6e6e80;
+  margin: 0 0 16px 0;
+}
+
+.dark .account-section h4 {
+  color: #8e8e93;
+}
+
+.account-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.account-input {
+  width: 100%;
+  height: 44px;
+  padding: 0 16px;
+  border: 1px solid #e5e5e5;
+  border-radius: 10px;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s;
+  background: #ffffff;
+  color: #1a1a1a;
+}
+
+.account-input:focus {
+  border-color: #007aff;
+}
+
+.dark .account-input {
+  background: #1a1b20;
+  border-color: #3a3b41;
+  color: #ffffff;
+}
+
+.dark .account-input:focus {
+  border-color: #007aff;
+}
+
+.account-btn {
+  width: 100%;
+  height: 44px;
+  background: #007aff;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.account-btn:hover:not(:disabled) {
+  background: #0051d4;
+}
+
+.account-btn:disabled {
+  background: #c7c7c7;
+  cursor: not-allowed;
+}
+
+.dark .account-btn:disabled {
+  background: #3a3b41;
+}
+
+.settings-options {
+  display: flex;
+  gap: 12px;
+}
+
+.settings-option {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  border: 2px solid #e5e5e5;
+  border-radius: 12px;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.settings-option:hover {
+  border-color: #007aff;
+  background: #f8faff;
+}
+
+.settings-option.active {
+  border-color: #007aff;
+  background: #eff6ff;
+}
+
+.dark .settings-option {
+  background: #1a1b20;
+  border-color: #3a3b41;
+}
+
+.dark .settings-option:hover {
+  border-color: #007aff;
+  background: #1c3a5e;
+}
+
+.dark .settings-option.active {
+  border-color: #007aff;
+  background: #1c3a5e;
+}
+
+.settings-option span {
+  font-size: 14px;
+  color: #1a1a1a;
+}
+
+.dark .settings-option span {
+  color: #ffffff;
+}
+
+.user-menu-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: #6e6e80;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.user-menu-btn:hover {
+  background: #f4f4f4;
+}
+
+.dark .user-menu-btn:hover {
+  background: #3a3b41;
+}
+
+.menu-divider {
+  height: 1px;
+  background: #e5e5e5;
+  margin: 8px 0;
+}
+
+.dark .menu-divider {
+  background: #3a3b41;
+}
+
 .rename-btn.cancel:hover {
   background: #e4e4e4;
 }
@@ -1430,6 +2291,506 @@ const adjustHeight = () => {
 
 .dark .rename-btn.cancel:hover {
   background: #545563;
+}
+
+.sidebar-footer {
+  padding: 12px;
+  border-top: 1px solid #e5e5e5;
+  position: relative;
+}
+
+.dark .sidebar-footer {
+  border-top-color: #3a3b41;
+}
+
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 8px;
+}
+
+.sidebar-user:hover {
+  background: #f4f4f4;
+}
+
+.dark .sidebar-user:hover {
+  background: #3a3b41;
+}
+
+.sidebar-user .user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #007aff 0%, #0051d4 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.sidebar-user .user-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-user .user-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1a1a1a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dark .sidebar-user .user-name {
+  color: #ffffff;
+}
+
+.sidebar-user .user-email {
+  font-size: 12px;
+  color: #6e6e80;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ============================================
+   Input Area - Modern Design
+   ============================================ */
+.input-area {
+  padding: 12px 16px 16px;
+  background: transparent;
+}
+
+.input-wrapper {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* File Preview */
+.file-preview-area {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.file-preview-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.file-preview-image {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.dark .file-preview-image {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.file-preview-document {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f5f5f7;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #1a1a1a;
+}
+
+.dark .file-preview-document {
+  background: #3a3b41;
+  color: #ffffff;
+}
+
+.file-preview-document span {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-remove-btn {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.file-remove-btn:hover {
+  background: #ff3b30;
+}
+
+/* Input Main Container */
+.input-main {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #ffffff;
+  border-radius: 24px;
+  border: 1px solid #e5e5e5;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.input-main:focus-within {
+  border-color: #007aff;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+}
+
+.dark .input-main {
+  background: #2a2b32;
+  border-color: #3a3b41;
+}
+
+.dark .input-main:focus-within {
+  border-color: #007aff;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+}
+
+/* Button Groups */
+.input-left-btns,
+.input-right-btns {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* Input Field */
+.input-field-wrapper {
+  flex: 1;
+  min-width: 0;
+}
+
+.input-textarea {
+  width: 100%;
+  padding: 6px 0;
+  border: none;
+  background: transparent;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #1a1a1a;
+  resize: none;
+  outline: none;
+  font-family: inherit;
+}
+
+.input-textarea::placeholder {
+  color: #8e8e93;
+}
+
+.dark .input-textarea {
+  color: #ffffff;
+}
+
+/* Action Buttons */
+.input-action-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8e8e93;
+  transition: all 0.2s;
+}
+
+.input-action-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #1a1a1a;
+}
+
+.input-action-btn.active {
+  color: #007aff;
+  background: rgba(0, 122, 255, 0.1);
+}
+
+.dark .input-action-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.dark .input-action-btn.active {
+  background: rgba(0, 122, 255, 0.2);
+}
+
+/* Send Button */
+.send-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: #007aff;
+  border-radius: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  transition: all 0.2s;
+}
+
+.send-btn:hover:not(:disabled) {
+  background: #0051d4;
+  transform: scale(1.05);
+}
+
+.send-btn:disabled {
+  background: #d1d1d6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.send-btn.stop {
+  background: #ff3b30;
+}
+
+.send-btn.stop:hover {
+  background: #d63029;
+}
+
+.dark .send-btn:disabled {
+  background: #48484a;
+}
+
+/* Workflow Selector */
+.workflow-selector {
+  position: relative;
+}
+
+.workflow-menu {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  right: 0;
+  width: 280px;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e5e5e5;
+  overflow: hidden;
+  z-index: 100;
+}
+
+.dark .workflow-menu {
+  background: #2a2b32;
+  border-color: #3a3b41;
+}
+
+.workflow-menu-header {
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #8e8e93;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.dark .workflow-menu-header {
+  border-bottom-color: #3a3b41;
+}
+
+.workflow-menu-list {
+  padding: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.workflow-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.workflow-option:hover {
+  background: #f5f5f7;
+}
+
+.workflow-option.active {
+  background: rgba(0, 122, 255, 0.1);
+}
+
+.dark .workflow-option:hover {
+  background: #3a3b41;
+}
+
+.dark .workflow-option.active {
+  background: rgba(0, 122, 255, 0.2);
+}
+
+.workflow-icon {
+  width: 36px;
+  height: 36px;
+  background: #f5f5f7;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.dark .workflow-icon {
+  background: #3a3b41;
+}
+
+.workflow-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.workflow-option .workflow-name {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1a1a1a;
+  margin-bottom: 2px;
+}
+
+.dark .workflow-option .workflow-name {
+  color: #ffffff;
+}
+
+.workflow-option .workflow-desc {
+  display: block;
+  font-size: 12px;
+  color: #8e8e93;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Mode Hints */
+.mode-hints {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  padding-left: 4px;
+}
+
+.mode-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: rgba(0, 122, 255, 0.1);
+  color: #007aff;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.mode-hint.workflow {
+  background: rgba(16, 163, 127, 0.1);
+  color: #10a37f;
+}
+
+.dark .mode-hint {
+  background: rgba(0, 122, 255, 0.15);
+}
+
+.dark .mode-hint.workflow {
+  background: rgba(16, 163, 127, 0.15);
+}
+
+.hint-dot {
+  width: 6px;
+  height: 6px;
+  background: currentColor;
+  border-radius: 50%;
+}
+
+/* Workflow Menu Transition */
+.workflow-menu-enter-active,
+.workflow-menu-leave-active {
+  transition: all 0.2s ease;
+}
+
+.workflow-menu-enter-from,
+.workflow-menu-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+/* Mode Hint Transition */
+.mode-hint-enter-active,
+.mode-hint-leave-active {
+  transition: all 0.2s ease;
+}
+
+.mode-hint-enter-from,
+.mode-hint-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+/* Mobile Responsive */
+@media (max-width: 640px) {
+  .input-area {
+    padding: 8px 12px 12px;
+  }
+
+  .input-main {
+    padding: 6px 10px;
+    border-radius: 20px;
+  }
+
+  .input-action-btn,
+  .send-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .input-textarea {
+    font-size: 16px; /* Prevent iOS zoom */
+  }
+
+  .workflow-menu {
+    position: fixed;
+    bottom: 80px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-height: 60vh;
+  }
+
+  .file-preview-area {
+    padding-bottom: 4px;
+  }
+
+  .file-preview-image {
+    width: 48px;
+    height: 48px;
+  }
 }
 </style>
 

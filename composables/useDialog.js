@@ -1,4 +1,4 @@
-import { ref } from 'vue';
+import { ref, nextTick } from 'vue';
 
 // 弹窗状态
 const visible = ref(false);
@@ -11,6 +11,7 @@ const alertVisible = ref(false);
 const alertType = ref('warning');
 const alertMessage = ref('');
 const alertDuration = ref(3000);
+const alertKey = ref(0);
 
 // 显示弹窗
 const showDialog = (msg, dialogType = 'info') => {
@@ -60,10 +61,20 @@ const handleCancel = () => {
 };
 
 // 显示顶部警告
-const showAlert = (msg, alertType = 'warning', duration = 3000) => {
+const showAlert = async (msg, alertTypeVal = 'warning', duration = 3000) => {
+  // 如果当前有弹窗显示，先关闭它
+  if (alertVisible.value) {
+    alertVisible.value = false;
+    // 等待关闭动画完成
+    await nextTick();
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+
+  // 显示新弹窗
   alertMessage.value = msg;
-  alertType.value = alertType;
+  alertType.value = alertTypeVal;
   alertDuration.value = duration;
+  alertKey.value++;
   alertVisible.value = true;
 };
 
@@ -90,6 +101,7 @@ export const useDialog = () => {
     alertType,
     alertMessage,
     alertDuration,
+    alertKey,
     showAlert,
     closeAlert,
   };
