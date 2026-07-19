@@ -528,6 +528,16 @@
               <!-- 正常显示 -->
               <div v-else>
                 <div class="message-content">
+                  <!-- 用户消息的图片附件 -->
+                  <div v-if="msg.role === 'user' && msg.metadata?.attachments" class="message-attachments">
+                    <img
+                      v-for="(attachment, idx) in msg.metadata.attachments.filter(a => a.type === 'image')"
+                      :key="idx"
+                      :src="getFileUrl(attachment.url)"
+                      class="message-image"
+                      @click="previewImage(getFileUrl(attachment.url))"
+                    />
+                  </div>
                   <!-- AI 消息内容为空时显示思考动画或错误 -->
                   <div v-if="msg.role === 'assistant' && !msg.content" class="thinking-indicator">
                     <!-- 如果当前正在流式传输中，显示思考动画 -->
@@ -763,6 +773,20 @@
       @confirm="dialog.handleConfirm"
       @cancel="dialog.handleCancel"
     />
+
+    <!-- Image Preview Modal -->
+    <Transition name="fade">
+      <div v-if="showImagePreview" class="image-preview-overlay" @click="closeImagePreview">
+        <div class="image-preview-container" @click.stop>
+          <button class="image-preview-close" @click="closeImagePreview">
+            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <img :src="previewImageUrl" class="image-preview-img" @click.stop />
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -1237,7 +1261,7 @@ const sendMessage = async () => {
     role: 'user',
     content: userMessage,
     created_at: new Date().toISOString(),
-    attachments: attachments.length > 0 ? attachments : undefined,
+    metadata: attachments.length > 0 ? { attachments } : undefined,
   });
 
   scrollToBottom();
@@ -1963,6 +1987,20 @@ const adjustHeight = () => {
     inputArea.value.style.height = 'auto';
     inputArea.value.style.height = Math.min(inputArea.value.scrollHeight, 200) + 'px';
   }
+};
+
+// 图片预览
+const previewImageUrl = ref('');
+const showImagePreview = ref(false);
+
+const previewImage = (url) => {
+  previewImageUrl.value = url;
+  showImagePreview.value = true;
+};
+
+const closeImagePreview = () => {
+  showImagePreview.value = false;
+  previewImageUrl.value = '';
 };
 </script>
 
@@ -2943,5 +2981,84 @@ const adjustHeight = () => {
 .message-action-btn.continue-btn:hover:not(:disabled) {
   background: rgba(16, 163, 127, 0.1);
   border-color: rgba(16, 163, 127, 0.5);
+}
+
+/* Message Attachments - 图片附件样式 */
+.message-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.message-image {
+  max-width: 200px;
+  max-height: 150px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.2s;
+  object-fit: cover;
+}
+
+.message-image:hover {
+  transform: scale(1.02);
+}
+
+/* Image Preview Modal */
+.image-preview-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.image-preview-container {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+}
+
+.image-preview-close {
+  position: absolute;
+  top: -40px;
+  right: 0;
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 50%;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.image-preview-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.image-preview-img {
+  max-width: 90vw;
+  max-height: 90vh;
+  border-radius: 8px;
+}
+
+/* Fade Transition */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>
