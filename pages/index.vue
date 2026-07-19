@@ -528,12 +528,18 @@
               <!-- 正常显示 -->
               <div v-else>
                 <div class="message-content">
-                  <!-- AI 消息内容为空时显示思考动画 -->
+                  <!-- AI 消息内容为空时显示思考动画或错误 -->
                   <div v-if="msg.role === 'assistant' && !msg.content" class="thinking-indicator">
-                    <span class="thinking-dot"></span>
-                    <span class="thinking-dot"></span>
-                    <span class="thinking-dot"></span>
+                    <!-- 如果当前正在流式传输中，显示思考动画 -->
+                    <template v-if="isStreaming && currentStreamingMessageId === msg.id">
+                      <span class="thinking-dot"></span>
+                      <span class="thinking-dot"></span>
+                      <span class="thinking-dot"></span>
+                    </template>
+                    <!-- 否则显示生成失败 -->
+                    <span v-else class="error-text">生成失败，请重试</span>
                   </div>
+                  <div v-else-if="msg.role === 'assistant' && msg.error" class="error-text">{{ msg.error }}</div>
                   <div v-else v-html="renderMarkdown(msg.content)"></div>
                 </div>
                 <!-- 消息操作按钮 -->
@@ -596,7 +602,7 @@
           <!-- 文件预览区 -->
           <div v-if="uploadedFiles.length > 0" class="file-preview-area">
             <div v-for="(file, index) in uploadedFiles" :key="index" class="file-preview-item">
-              <img v-if="file.type === 'image'" :src="file.url" class="file-preview-image" />
+              <img v-if="file.type === 'image'" :src="getFileUrl(file.url)" class="file-preview-image" />
               <div v-else class="file-preview-document">
                 <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -1019,7 +1025,7 @@ const createNewChat = async () => {
   try {
     const res = await fetchAPI('/api/chat/conversations', {
       method: 'POST',
-      body: JSON.stringify({ title: '新对话', model: selectedModel.value }),
+      body: JSON.stringify({ title: '新对话' }),
     });
     const data = await res.json();
     if (data.success) {
@@ -1133,6 +1139,17 @@ const cancelRename = () => {
 // ============================================
 // 文件上传
 // ============================================
+// 获取完整的文件 URL
+const getFileUrl = (url) => {
+  if (!url) return '';
+  // 如果已经是完整 URL，直接返回
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  // 拼接 API 前缀
+  return `${config.public.apiBase}${url}`;
+};
+
 const triggerFileUpload = () => {
   fileInput.value?.click();
 };
@@ -1213,8 +1230,10 @@ const sendMessage = async () => {
   // 清空已上传文件
   uploadedFiles.value = [];
 
+  // 创建临时用户消息 ID
+  const tempUserMsgId = Date.now();
   messages.value.push({
-    id: Date.now(),
+    id: tempUserMsgId,
     role: 'user',
     content: userMessage,
     created_at: new Date().toISOString(),
@@ -1223,6 +1242,16 @@ const sendMessage = async () => {
 
   scrollToBottom();
   isStreaming.value = true;
+
+  // 创建临时的 AI 消息用于显示思考状态
+  const tempAiMsgId = `temp-${Date.now()}`;
+  messages.value.push({
+    id: tempAiMsgId,
+    role: 'assistant',
+    content: '',
+    created_at: new Date().toISOString(),
+  });
+  currentStreamingMessageId.value = tempAiMsgId;
 
   // 创建 AbortController
   abortController.value = new AbortController();
@@ -1240,10 +1269,15 @@ const sendMessage = async () => {
       signal: abortController.value.signal,
     });
 
+    // 检查 HTTP 响应状态
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || `请求失败 (${res.status})`);
+    }
+
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
-    let assistantMsgIndex = -1;
-    let tempMessageId = null;
+    let realMessageCreated = false;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -1256,23 +1290,33 @@ const sendMessage = async () => {
         if (line.startsWith('data: ')) {
           const data = JSON.parse(line.substring(6));
           if (data.type === 'start') {
-            // 收到 start 事件，创建 AI 消息，使用后端返回的真实ID
-            const realMessageId = data.message_id;
-            messages.value.push({
-              id: realMessageId,
-              role: 'assistant',
-              content: '',
-              created_at: new Date().toISOString(),
-            });
-            assistantMsgIndex = messages.value.length - 1;
-            currentStreamingMessageId.value = realMessageId;
-          } else if (data.type === 'chunk' && assistantMsgIndex !== -1) {
-            // 直接修改数组中的对象
-            messages.value[assistantMsgIndex].content += data.content;
-            scrollToBottom();
-          } else if (data.type === 'done' && assistantMsgIndex !== -1) {
-            // 生成完成，从停止集合中移除
-            stoppedMessages.value.delete(messages.value[assistantMsgIndex].id);
+            // 收到 start 事件，更新消息的真实 ID
+            // 1. 更新用户消息 ID
+            if (data.user_message_id) {
+              const userMsgIndex = messages.value.findIndex(m => m.id === tempUserMsgId);
+              if (userMsgIndex !== -1) {
+                messages.value[userMsgIndex].id = data.user_message_id;
+              }
+            }
+            // 2. 更新 AI 消息 ID
+            if (data.message_id) {
+              const aiMsgIndex = messages.value.findIndex(m => m.id === tempAiMsgId);
+              if (aiMsgIndex !== -1) {
+                messages.value[aiMsgIndex].id = data.message_id;
+                currentStreamingMessageId.value = data.message_id;
+              }
+            }
+            realMessageCreated = true;
+          } else if (data.type === 'chunk') {
+            // 找到当前正在流式传输的消息并追加内容
+            const msgIndex = messages.value.findIndex(m => m.id === currentStreamingMessageId.value);
+            if (msgIndex !== -1) {
+              messages.value[msgIndex].content += data.content;
+              scrollToBottom();
+            }
+          } else if (data.type === 'done') {
+            // 生成完成
+            stoppedMessages.value.delete(currentStreamingMessageId.value);
             currentStreamingMessageId.value = null;
           }
         }
@@ -1307,12 +1351,25 @@ const sendMessage = async () => {
       }
     }
   } catch (err) {
+    // 删除临时消息（用户消息和 AI 消息）
+    // 注意：如果收到过 start 事件，消息 ID 已更新为真实 ID，需要查找真实位置
+    const userMsgIndex = messages.value.findIndex(m => m.id === tempUserMsgId || m.role === 'user' && messages.value.indexOf(m) === messages.value.length - 2);
+    if (userMsgIndex !== -1) {
+      messages.value.splice(userMsgIndex, 1);
+    }
+
+    const aiMsgIndex = messages.value.findIndex(m => m.id === tempAiMsgId || m.role === 'assistant' && messages.value.indexOf(m) === messages.value.length - 1);
+    if (aiMsgIndex !== -1) {
+      messages.value.splice(aiMsgIndex, 1);
+    }
+    currentStreamingMessageId.value = null;
+
     if (err.name === 'AbortError') {
       // 用户主动取消，不做错误提示
       console.log('Generation stopped by user');
     } else {
       console.error('Send message error:', err);
-      await dialog.showError('发送失败，请重试');
+      await dialog.showError(err.message || '发送失败，请重试');
     }
   } finally {
     isStreaming.value = false;
@@ -1464,16 +1521,22 @@ const regenerateMessage = async (messageIndex) => {
   const aiMsg = messages.value[messageIndex];
 
   try {
-    // 调用后端 API 删除该 AI 回复及之后的所有消息
-    const res = await fetchAPI(`/api/chat/conversations/${currentConversationId.value}/messages/${aiMsg.id}`, {
-      method: 'DELETE',
-    });
+    // 如果 AI 消息是临时 ID 或空内容（表示失败的消息），跳过后端删除
+    const isTempMessage = aiMsg.id.toString().startsWith('temp-');
+    const isEmptyMessage = !aiMsg.content;
 
-    const data = await res.json();
-    if (!data.success) {
-      await dialog.showError(data.error.message || '重新生成失败');
-      isRegenerating.value = false;
-      return;
+    if (!isTempMessage && !isEmptyMessage) {
+      // 调用后端 API 删除该 AI 回复及之后的所有消息
+      const res = await fetchAPI(`/api/chat/conversations/${currentConversationId.value}/messages/${aiMsg.id}`, {
+        method: 'DELETE',
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        await dialog.showError(data.error.message || '重新生成失败');
+        isRegenerating.value = false;
+        return;
+      }
     }
 
     // 删除本地消息（从该 AI 回复开始到末尾）
@@ -1571,6 +1634,16 @@ const generateAIResponse = async () => {
 
   isStreaming.value = true;
 
+  // 先创建临时 AI 消息用于显示思考状态
+  const tempAiMsgId = `temp-regen-${Date.now()}`;
+  messages.value.push({
+    id: tempAiMsgId,
+    role: 'assistant',
+    content: '',
+    created_at: new Date().toISOString(),
+  });
+  currentStreamingMessageId.value = tempAiMsgId;
+
   try {
     // 使用 /generate 接口，只生成AI回复，不保存用户消息
     const response = await fetchAPI(`/api/chat/conversations/${currentConversationId.value}/generate`, {
@@ -1583,13 +1656,14 @@ const generateAIResponse = async () => {
       }),
     });
 
+    // 检查 HTTP 响应状态
     if (!response.ok) {
-      throw new Error('请求失败');
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || `请求失败 (${response.status})`);
     }
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
-    let aiMsgIndex = -1;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -1604,17 +1678,23 @@ const generateAIResponse = async () => {
             const data = JSON.parse(line.slice(6));
 
             if (data.type === 'start') {
-              // 使用后端返回的真实消息ID
+              // 更新 AI 消息的真实 ID
               const realMessageId = data.message_id;
-              messages.value.push({ id: realMessageId, role: 'assistant', content: '' });
-              aiMsgIndex = messages.value.length - 1;
-              currentStreamingMessageId.value = realMessageId;
-            } else if (data.type === 'chunk' && aiMsgIndex !== -1) {
-              messages.value[aiMsgIndex].content += data.content;
-              scrollToBottom();
-            } else if (data.type === 'done' && aiMsgIndex !== -1) {
-              // 生成完成，从停止集合中移除
-              stoppedMessages.value.delete(messages.value[aiMsgIndex].id);
+              const aiMsgIndex = messages.value.findIndex(m => m.id === tempAiMsgId);
+              if (aiMsgIndex !== -1) {
+                messages.value[aiMsgIndex].id = realMessageId;
+                currentStreamingMessageId.value = realMessageId;
+              }
+            } else if (data.type === 'chunk') {
+              // 找到当前消息并追加内容
+              const aiMsgIndex = messages.value.findIndex(m => m.id === currentStreamingMessageId.value);
+              if (aiMsgIndex !== -1) {
+                messages.value[aiMsgIndex].content += data.content;
+                scrollToBottom();
+              }
+            } else if (data.type === 'done') {
+              // 生成完成
+              stoppedMessages.value.delete(currentStreamingMessageId.value);
               currentStreamingMessageId.value = null;
             }
           } catch (e) {
@@ -1625,8 +1705,15 @@ const generateAIResponse = async () => {
     }
 
   } catch (err) {
+    // 删除临时 AI 消息
+    const aiMsgIndex = messages.value.findIndex(m => m.id === tempAiMsgId);
+    if (aiMsgIndex !== -1) {
+      messages.value.splice(aiMsgIndex, 1);
+    }
+    currentStreamingMessageId.value = null;
+
     console.error('Generate AI response error:', err);
-    await dialog.showError('生成回复失败');
+    await dialog.showError(err.message || '生成回复失败');
   } finally {
     isStreaming.value = false;
   }
@@ -1766,7 +1853,6 @@ const saveUserSettings = async () => {
       body: JSON.stringify({
         theme: userSettings.value.theme,
         language: userSettings.value.language,
-        default_model: selectedModel.value,
       }),
     });
     const response = await res.json();
@@ -2824,6 +2910,16 @@ const adjustHeight = () => {
 @keyframes bounce {
   0%, 80%, 100% { transform: scale(0); }
   40% { transform: scale(1); }
+}
+
+/* 错误文本样式 */
+.error-text {
+  color: #ff3b30;
+  font-size: 14px;
+}
+
+.dark .error-text {
+  color: #ff6b6b;
 }
 
 /* 编辑按钮禁用状态 */
