@@ -1091,6 +1091,15 @@ const selectConversation = async (id) => {
     const data = await res.json();
     if (data.success) {
       messages.value = data.data;
+
+      // 初始化 stoppedMessages 集合（从 metadata 中读取停止状态）
+      stoppedMessages.value = new Set();
+      for (const msg of data.data) {
+        if (msg.role === 'assistant' && msg.metadata?.stopped) {
+          stoppedMessages.value.add(msg.id);
+        }
+      }
+
       scrollToBottom();
     }
   } catch (err) {
@@ -1408,24 +1417,39 @@ const sendMessage = async () => {
   } catch (err) {
     // 删除临时消息（用户消息和 AI 消息）
     // 注意：如果收到过 start 事件，消息 ID 已更新为真实 ID，需要查找真实位置
-    const userMsgIndex = messages.value.findIndex(m => m.id === tempUserMsgId || m.role === 'user' && messages.value.indexOf(m) === messages.value.length - 2);
-    if (userMsgIndex !== -1) {
-      messages.value.splice(userMsgIndex, 1);
-    }
-
-    const aiMsgIndex = messages.value.findIndex(m => m.id === tempAiMsgId || m.role === 'assistant' && messages.value.indexOf(m) === messages.value.length - 1);
-    if (aiMsgIndex !== -1) {
-      messages.value.splice(aiMsgIndex, 1);
-    }
-    currentStreamingMessageId.value = null;
-
     if (err.name === 'AbortError') {
-      // 用户主动取消，不做错误提示
+      // 用户主动取消
       console.log('Generation stopped by user');
+      // 如果已经收到 start 事件，消息已保存到数据库，不删除
+      // 如果还没收到 start 事件，需要删除临时消息
+      if (!realMessageCreated) {
+        // 删除临时用户消息
+        const userMsgIndex = messages.value.findIndex(m => m.id === tempUserMsgId);
+        if (userMsgIndex !== -1) {
+          messages.value.splice(userMsgIndex, 1);
+        }
+        // 删除临时 AI 消息
+        const aiMsgIndex = messages.value.findIndex(m => m.id === tempAiMsgId);
+        if (aiMsgIndex !== -1) {
+          messages.value.splice(aiMsgIndex, 1);
+        }
+      }
     } else {
+      // 其他错误，删除消息并提示
+      const userMsgIndex = messages.value.findIndex(m => m.id === tempUserMsgId || m.role === 'user' && messages.value.indexOf(m) === messages.value.length - 2);
+      if (userMsgIndex !== -1) {
+        messages.value.splice(userMsgIndex, 1);
+      }
+
+      const aiMsgIndex = messages.value.findIndex(m => m.id === tempAiMsgId || m.role === 'assistant' && messages.value.indexOf(m) === messages.value.length - 1);
+      if (aiMsgIndex !== -1) {
+        messages.value.splice(aiMsgIndex, 1);
+      }
+
       console.error('Send message error:', err);
       await dialog.showError(err.message || '发送失败，请重试');
     }
+    currentStreamingMessageId.value = null;
   } finally {
     isStreaming.value = false;
     abortController.value = null;
