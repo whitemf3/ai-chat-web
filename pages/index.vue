@@ -254,7 +254,7 @@
       </div>
 
       <div class="sidebar-footer">
-        <div class="sidebar-user">
+        <div class="sidebar-user" @click="showUserMenu = !showUserMenu" title="更多选项">
           <div class="user-avatar">
             {{ (user?.username || '用户').charAt(0).toUpperCase() }}
           </div>
@@ -262,11 +262,11 @@
             <div class="user-name">{{ user?.username || '用户' }}</div>
             <div class="user-email">{{ user?.email || '' }}</div>
           </div>
-          <button class="user-menu-btn" @click="showUserMenu = !showUserMenu" title="更多选项">
+          <div class="user-menu-icon">
             <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
               <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
             </svg>
-          </button>
+          </div>
         </div>
 
         <!-- User Menu Popup -->
@@ -661,7 +661,7 @@
               <!-- 深度思考按钮 -->
               <button
                 :class="['input-action-btn', { active: deepThink }]"
-                @click="deepThink = !deepThink"
+                @click="toggleDeepThink"
                 title="深度思考模式"
               >
                 <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -677,7 +677,12 @@
                   title="选择AI工作流"
                 >
                   <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 8l3-3m0 0l3 3M6 5v14" />
+                    <rect x="9" y="3" width="5" height="5" rx="1" stroke-width="1.8" />
+                    <rect x="9" y="10" width="5" height="5" rx="1" stroke-width="1.8" />
+                    <rect x="9" y="17" width="5" height="4" rx="1" stroke-width="1.8" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M14 5.5h3a2 2 0 012 2v9a2 2 0 01-2 2h-3" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21 12h-2" />
                   </svg>
                 </button>
 
@@ -689,27 +694,18 @@
                     </div>
                     <div class="workflow-menu-list">
                       <div
-                        class="workflow-option"
-                        :class="{ active: !selectedWorkflow }"
-                        @click="selectWorkflow(null)"
-                      >
-                        <div class="workflow-icon">🎯</div>
-                        <div class="workflow-info">
-                          <span class="workflow-name">自动选择</span>
-                          <span class="workflow-desc">根据规则智能匹配</span>
-                        </div>
-                        <svg v-if="!selectedWorkflow" width="16" height="16" fill="#007aff" viewBox="0 0 20 20">
-                          <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                        </svg>
-                      </div>
-                      <div
                         v-for="workflow in workflows"
                         :key="workflow.id"
                         class="workflow-option"
                         :class="{ active: selectedWorkflow?.id === workflow.id }"
                         @click="selectWorkflow(workflow)"
                       >
-                        <div class="workflow-icon">🔄</div>
+                        <div class="workflow-icon">
+                          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h4M4 12h4M4 18h4" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6l3 3-3 3M12 18l3-3-3-3" />
+                          </svg>
+                        </div>
                         <div class="workflow-info">
                           <span class="workflow-name">{{ workflow.name }}</span>
                           <span class="workflow-desc">{{ workflow.description || `${workflow.step_count} 个步骤` }}</span>
@@ -717,6 +713,19 @@
                         <svg v-if="selectedWorkflow?.id === workflow.id" width="16" height="16" fill="#007aff" viewBox="0 0 20 20">
                           <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
                         </svg>
+                      </div>
+
+                      <!-- 取消选择 -->
+                      <div
+                        v-if="selectedWorkflow"
+                        class="workflow-option cancel"
+                        @click="selectWorkflow(null)"
+                      >
+                        <div class="workflow-icon">✕</div>
+                        <div class="workflow-info">
+                          <span class="workflow-name">取消选择</span>
+                          <span class="workflow-desc">使用智能模型选择</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -998,10 +1007,23 @@ const loadWorkflows = async () => {
   }
 };
 
-// 选择工作流
+// 切换深度思考（互斥逻辑）
+const toggleDeepThink = () => {
+  deepThink.value = !deepThink.value;
+  // 如果开启深度思考，清除工作流选择
+  if (deepThink.value) {
+    selectedWorkflow.value = null;
+  }
+};
+
+// 选择工作流（互斥逻辑）
 const selectWorkflow = (workflow) => {
   selectedWorkflow.value = workflow;
   showWorkflowMenu.value = false;
+  // 如果选择了工作流，关闭深度思考
+  if (workflow) {
+    deepThink.value = false;
+  }
 };
 
 const loadConversations = async () => {
@@ -1320,6 +1342,10 @@ const sendMessage = async () => {
               const userMsgIndex = messages.value.findIndex(m => m.id === tempUserMsgId);
               if (userMsgIndex !== -1) {
                 messages.value[userMsgIndex].id = data.user_message_id;
+                // 使用后端返回的时间戳，确保与数据库一致
+                if (data.user_created_at) {
+                  messages.value[userMsgIndex].created_at = data.user_created_at;
+                }
               }
             }
             // 2. 更新 AI 消息 ID
@@ -1328,6 +1354,10 @@ const sendMessage = async () => {
               if (aiMsgIndex !== -1) {
                 messages.value[aiMsgIndex].id = data.message_id;
                 currentStreamingMessageId.value = data.message_id;
+                // 使用后端返回的时间戳，确保与数据库一致
+                if (data.created_at) {
+                  messages.value[aiMsgIndex].created_at = data.created_at;
+                }
               }
             }
             realMessageCreated = true;
@@ -1702,11 +1732,15 @@ const generateAIResponse = async () => {
             const data = JSON.parse(line.slice(6));
 
             if (data.type === 'start') {
-              // 更新 AI 消息的真实 ID
+              // 更新 AI 消息的真实 ID 和时间戳
               const realMessageId = data.message_id;
               const aiMsgIndex = messages.value.findIndex(m => m.id === tempAiMsgId);
               if (aiMsgIndex !== -1) {
                 messages.value[aiMsgIndex].id = realMessageId;
+                // 使用后端返回的时间戳，确保与数据库一致
+                if (data.created_at) {
+                  messages.value[aiMsgIndex].created_at = data.created_at;
+                }
                 currentStreamingMessageId.value = realMessageId;
               }
             } else if (data.type === 'chunk') {
@@ -2362,27 +2396,15 @@ const closeImagePreview = () => {
   color: #ffffff;
 }
 
-.user-menu-btn {
+.user-menu-icon {
   width: 32px;
   height: 32px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 6px;
   color: #6e6e80;
-  transition: background 0.2s;
   flex-shrink: 0;
-}
-
-.user-menu-btn:hover {
-  background: #f4f4f4;
-}
-
-.dark .user-menu-btn:hover {
-  background: #3a3b41;
 }
 
 .menu-divider {
@@ -2433,6 +2455,8 @@ const closeImagePreview = () => {
   gap: 12px;
   padding: 10px;
   border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
 }
 
 .sidebar-user:hover {
@@ -2763,6 +2787,25 @@ const closeImagePreview = () => {
   background: rgba(0, 122, 255, 0.1);
 }
 
+.workflow-option.cancel {
+  border-top: 1px solid #e5e5e5;
+  margin-top: 8px;
+  padding-top: 16px;
+}
+
+.workflow-option.cancel .workflow-icon {
+  background: #ff3b30;
+  color: white;
+}
+
+.workflow-option.cancel .workflow-name {
+  color: #ff3b30;
+}
+
+.dark .workflow-option.cancel {
+  border-top-color: #3a3b41;
+}
+
 .dark .workflow-option:hover {
   background: #3a3b41;
 }
@@ -2781,6 +2824,7 @@ const closeImagePreview = () => {
   justify-content: center;
   font-size: 18px;
   flex-shrink: 0;
+  color: #007aff;
 }
 
 .dark .workflow-icon {
