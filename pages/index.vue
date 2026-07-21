@@ -1365,23 +1365,18 @@ const sendMessage = async () => {
               realMessageCreated = true;
             } else if (data.type === 'chunk') {
               // 找到当前正在流式传输的消息并追加内容
-              // 只有在还在流式传输时才处理
-              if (isStreaming.value && currentStreamingMessageId.value) {
-                const msgIndex = messages.value.findIndex(m => m.id === currentStreamingMessageId.value);
-                if (msgIndex !== -1) {
-                  messages.value[msgIndex].content += data.content;
-                  scrollToBottom();
-                }
+              const msgIndex = messages.value.findIndex(m => m.id === currentStreamingMessageId.value);
+              if (msgIndex !== -1) {
+                messages.value[msgIndex].content += data.content;
+                scrollToBottom();
               }
             } else if (data.type === 'error') {
               // AI 生成错误
               throw new Error(formatAIError(data.message));
             } else if (data.type === 'done') {
-              // 生成完成，只有在还在流式传输时才处理
-              if (isStreaming.value) {
-                stoppedMessages.value.delete(currentStreamingMessageId.value);
-                currentStreamingMessageId.value = null;
-              }
+              // 生成完成
+              stoppedMessages.value.delete(currentStreamingMessageId.value);
+              currentStreamingMessageId.value = null;
             }
           } catch (parseError) {
             // JSON 解析错误，可能是数据不完整
@@ -1468,24 +1463,20 @@ const sendSuggestion = async (text) => {
 
 // 停止生成
 const stopGeneration = async () => {
-  // 先标记为停止，防止后续事件被处理
-  const stoppedMsgId = currentStreamingMessageId.value;
-  isStreaming.value = false;
-
   if (abortController.value) {
     abortController.value.abort();
     abortController.value = null;
   }
 
   // 保存部分生成的内容并标记为已停止
-  if (stoppedMsgId && messages.value.length > 0) {
+  if (currentStreamingMessageId.value && messages.value.length > 0) {
     const lastMsgIndex = messages.value.length - 1;
     const lastMsg = messages.value[lastMsgIndex];
 
-    if (lastMsg.role === 'assistant' && lastMsg.content && stoppedMsgId === lastMsg.id) {
+    if (lastMsg.role === 'assistant' && lastMsg.content && currentStreamingMessageId.value === lastMsg.id) {
       try {
         // 调用后端保存部分内容
-        const res = await fetchAPI(`/api/chat/conversations/${currentConversationId.value}/messages/${stoppedMsgId}/partial`, {
+        const res = await fetchAPI(`/api/chat/conversations/${currentConversationId.value}/messages/${currentStreamingMessageId.value}/partial`, {
           method: 'POST',
           body: JSON.stringify({ content: lastMsg.content }),
         });
@@ -1493,7 +1484,7 @@ const stopGeneration = async () => {
         const data = await res.json();
         if (data.success) {
           // 标记为已停止，显示"继续生成"按钮
-          stoppedMessages.value.add(stoppedMsgId);
+          stoppedMessages.value.add(currentStreamingMessageId.value);
         }
       } catch (err) {
         console.error('Save partial message error:', err);
@@ -1501,6 +1492,7 @@ const stopGeneration = async () => {
     }
   }
 
+  isStreaming.value = false;
   currentStreamingMessageId.value = null;
 };
 
