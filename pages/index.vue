@@ -1342,10 +1342,6 @@ const sendMessage = async () => {
               const userMsgIndex = messages.value.findIndex(m => m.id === tempUserMsgId);
               if (userMsgIndex !== -1) {
                 messages.value[userMsgIndex].id = data.user_message_id;
-                // 使用后端返回的时间戳，确保与数据库一致
-                if (data.user_created_at) {
-                  messages.value[userMsgIndex].created_at = data.user_created_at;
-                }
               }
             }
             // 2. 更新 AI 消息 ID
@@ -1354,10 +1350,6 @@ const sendMessage = async () => {
               if (aiMsgIndex !== -1) {
                 messages.value[aiMsgIndex].id = data.message_id;
                 currentStreamingMessageId.value = data.message_id;
-                // 使用后端返回的时间戳，确保与数据库一致
-                if (data.created_at) {
-                  messages.value[aiMsgIndex].created_at = data.created_at;
-                }
               }
             }
             realMessageCreated = true;
@@ -1579,25 +1571,13 @@ const regenerateMessage = async (messageIndex) => {
     const isTempMessage = aiMsg.id.toString().startsWith('temp-');
     const isEmptyMessage = !aiMsg.content;
 
-    if (!isTempMessage && !isEmptyMessage) {
-      // 调用后端 API 删除该 AI 回复及之后的所有消息
-      const res = await fetchAPI(`/api/chat/conversations/${currentConversationId.value}/messages/${aiMsg.id}`, {
-        method: 'DELETE',
-      });
-
-      const data = await res.json();
-      if (!data.success) {
-        await dialog.showError(data.error.message || '重新生成失败');
-        isRegenerating.value = false;
-        return;
-      }
-    }
-
     // 删除本地消息（从该 AI 回复开始到末尾）
     messages.value.splice(messageIndex);
 
-    // 使用 generateAIResponse 重新生成（不重复保存用户消息）
-    await generateAIResponse();
+    // 使用 generateAIResponse 重新生成，传递 regenerate_from 参数
+    // 后端会在生成前先删除该消息及之后的所有消息（原子操作，避免竞态条件）
+    const regenerateFrom = (!isTempMessage && !isEmptyMessage) ? aiMsg.id : null;
+    await generateAIResponse(regenerateFrom);
 
   } catch (err) {
     console.error('Regenerate error:', err);
@@ -1670,6 +1650,7 @@ const saveMessageEdit = async (index) => {
     }
 
     // 如果是用户消息，重新生成 AI 回复
+    // 注意：后端已经在 PUT 请求中删除了后续消息，这里不需要传 regenerate_from
     if (msg.role === 'user') {
       await generateAIResponse();
     }
@@ -1683,7 +1664,7 @@ const saveMessageEdit = async (index) => {
 };
 
 // 生成AI回复（不保存用户消息）
-const generateAIResponse = async () => {
+const generateAIResponse = async (regenerateFrom = null) => {
   if (!currentConversationId.value) return;
 
   isStreaming.value = true;
@@ -1699,15 +1680,23 @@ const generateAIResponse = async () => {
   currentStreamingMessageId.value = tempAiMsgId;
 
   try {
+    // 构建请求体
+    const requestBody = {
+      stream: true,
+    };
+
+    // 如果是重新生成，传递 regenerate_from 参数
+    if (regenerateFrom) {
+      requestBody.regenerate_from = regenerateFrom;
+    }
+
     // 使用 /generate 接口，只生成AI回复，不保存用户消息
     const response = await fetchAPI(`/api/chat/conversations/${currentConversationId.value}/generate`, {
       method: 'POST',
       headers: {
         'Accept': 'text/event-stream',
       },
-      body: JSON.stringify({
-        stream: true,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     // 检查 HTTP 响应状态
@@ -1732,15 +1721,11 @@ const generateAIResponse = async () => {
             const data = JSON.parse(line.slice(6));
 
             if (data.type === 'start') {
-              // 更新 AI 消息的真实 ID 和时间戳
+              // 更新 AI 消息的真实 ID
               const realMessageId = data.message_id;
               const aiMsgIndex = messages.value.findIndex(m => m.id === tempAiMsgId);
               if (aiMsgIndex !== -1) {
                 messages.value[aiMsgIndex].id = realMessageId;
-                // 使用后端返回的时间戳，确保与数据库一致
-                if (data.created_at) {
-                  messages.value[aiMsgIndex].created_at = data.created_at;
-                }
                 currentStreamingMessageId.value = realMessageId;
               }
             } else if (data.type === 'chunk') {
