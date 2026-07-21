@@ -528,15 +528,49 @@
               <!-- 正常显示 -->
               <div v-else>
                 <div class="message-content">
-                  <!-- 用户消息的图片附件 -->
+                  <!-- 用户消息的附件 -->
                   <div v-if="msg.role === 'user' && msg.metadata?.attachments" class="message-attachments">
+                    <!-- 图片附件 -->
                     <img
                       v-for="(attachment, idx) in msg.metadata.attachments.filter(a => a.type === 'image')"
-                      :key="idx"
+                      :key="'img-' + idx"
                       :src="getFileUrl(attachment.url)"
                       class="message-image"
                       @click="previewImage(getFileUrl(attachment.url))"
                     />
+                    <!-- 文档附件 -->
+                    <div
+                      v-for="(attachment, idx) in msg.metadata.attachments.filter(a => a.type === 'document')"
+                      :key="'doc-' + idx"
+                      class="message-document"
+                      @click="downloadFile(attachment)"
+                    >
+                      <div class="document-icon">
+                        <!-- PDF 图标 -->
+                        <svg v-if="getFileExtension(attachment.name) === 'pdf'" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                          <text x="8" y="15" font-size="5" fill="currentColor" font-weight="bold">PDF</text>
+                        </svg>
+                        <!-- Word 图标 -->
+                        <svg v-else-if="getFileExtension(attachment.name) === 'docx'" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6M9 15h4" />
+                        </svg>
+                        <!-- Excel 图标 -->
+                        <svg v-else-if="['xlsx', 'xls'].includes(getFileExtension(attachment.name))" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 10h2M13 10h2M9 14h2M13 14h2" />
+                        </svg>
+                        <!-- 默认文档图标 -->
+                        <svg v-else width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+                      <span class="document-name">{{ attachment.name || '文档' }}</span>
+                      <svg class="document-download" width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                    </div>
                   </div>
                   <!-- AI 消息内容为空时显示思考动画或错误 -->
                   <div v-if="msg.role === 'assistant' && !msg.content" class="thinking-indicator">
@@ -590,7 +624,7 @@
                   </button>
                   <button
                     class="message-action-btn"
-                    :disabled="isRegenerating"
+                    :disabled="isRegenerating || isContinuing"
                     @click="regenerateMessage(index)"
                     title="重新生成"
                   >
@@ -612,18 +646,54 @@
           <!-- 文件预览区 -->
           <div v-if="uploadedFiles.length > 0" class="file-preview-area">
             <div v-for="(file, index) in uploadedFiles" :key="index" class="file-preview-item">
-              <img v-if="file.type === 'image'" :src="getFileUrl(file.url)" class="file-preview-image" />
-              <div v-else class="file-preview-document">
-                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <span>{{ file.name }}</span>
+              <!-- 图片预览 -->
+              <div v-if="file.type === 'image'" class="file-preview-image-wrapper">
+                <img :src="getFileUrl(file.url)" class="file-preview-image" />
+                <button class="file-remove-btn" @click="removeFile(index)" title="移除">
+                  <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
-              <button class="file-remove-btn" @click="removeFile(index)" title="移除">
-                <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+              <!-- 文档预览 -->
+              <div v-else class="file-preview-document">
+                <div class="file-icon">
+                  <!-- PDF 图标 -->
+                  <svg v-if="getFileExtension(file.name) === 'pdf'" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    <text x="8" y="15" font-size="6" fill="currentColor" font-weight="bold">PDF</text>
+                  </svg>
+                  <!-- Word 图标 -->
+                  <svg v-else-if="getFileExtension(file.name) === 'docx'" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6M9 15h4" />
+                  </svg>
+                  <!-- Excel 图标 -->
+                  <svg v-else-if="['xlsx', 'xls'].includes(getFileExtension(file.name))" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 10h2M13 10h2M9 14h2M13 14h2" />
+                  </svg>
+                  <!-- TXT 图标 -->
+                  <svg v-else-if="getFileExtension(file.name) === 'txt'" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6M9 16h6M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                  <!-- MD 图标 -->
+                  <svg v-else-if="getFileExtension(file.name) === 'md'" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 13l2 2 4-4" />
+                  </svg>
+                  <!-- 默认文档图标 -->
+                  <svg v-else width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <span class="file-name" :title="file.name">{{ file.name }}</span>
+                <button class="file-remove-btn" @click.stop="removeFile(index)" title="移除">
+                  <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -632,15 +702,18 @@
             <!-- 左侧按钮组 -->
             <div class="input-left-btns">
               <!-- 文件上传按钮 -->
-              <button class="input-action-btn" @click="triggerFileUpload" :disabled="isUploading" title="上传文件">
-                <svg v-if="!isUploading" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                </svg>
-                <svg v-else width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" class="spinner">
-                  <circle cx="12" cy="12" r="10" stroke-width="2" stroke-dasharray="31.4" stroke-dashoffset="10" />
-                </svg>
-              </button>
-              <input ref="fileInput" type="file" accept="image/*,.pdf,.txt,.md" multiple style="display: none" @change="handleFileUpload" />
+              <div class="upload-btn-wrapper">
+                <button class="input-action-btn" @click="triggerFileUpload" :disabled="isUploading" title="上传文件">
+                  <svg v-if="!isUploading" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                  </svg>
+                  <svg v-else width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" class="spinner">
+                    <circle cx="12" cy="12" r="10" stroke-width="2" stroke-dasharray="31.4" stroke-dashoffset="10" />
+                  </svg>
+                </button>
+                <div class="upload-hint">图片、PDF、Word、Excel、TXT、MD</div>
+              </div>
+              <input ref="fileInput" type="file" accept="image/*,.txt,.md,.docx,.pdf,.xlsx,.xls" multiple style="display: none" @change="handleFileUpload" />
             </div>
 
             <!-- 输入框 -->
@@ -1222,6 +1295,25 @@ const getFileUrl = (url) => {
   return `${config.public.apiBase}${url}`;
 };
 
+// 获取文件扩展名
+const getFileExtension = (filename) => {
+  if (!filename) return '';
+  const ext = filename.toLowerCase().split('.').pop();
+  return ext || '';
+};
+
+// 下载文件
+const downloadFile = (file) => {
+  const url = getFileUrl(file.url);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = file.name || 'download';
+  link.target = '_blank';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
 const triggerFileUpload = () => {
   fileInput.value?.click();
 };
@@ -1233,6 +1325,21 @@ const handleFileUpload = async (e) => {
   isUploading.value = true;
 
   for (const file of files) {
+    const fileName = file.name.toLowerCase();
+    const isImage = file.type.startsWith('image/');
+    const isTxt = fileName.endsWith('.txt');
+    const isMd = fileName.endsWith('.md');
+    const isDocx = fileName.endsWith('.docx');
+    const isPdf = fileName.endsWith('.pdf');
+    const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
+    const isDocument = isTxt || isMd || isDocx || isPdf || isExcel;
+
+    // 检查文件类型
+    if (!isImage && !isDocument) {
+      dialog.showError(`文件 ${file.name} 格式不支持，目前仅支持图片、txt、md、docx、pdf、xlsx、xls 格式`);
+      continue;
+    }
+
     // 检查文件大小 (最大 10MB)
     if (file.size > 10 * 1024 * 1024) {
       dialog.showError(`文件 ${file.name} 超过 10MB 限制`);
@@ -1241,6 +1348,38 @@ const handleFileUpload = async (e) => {
 
     const formData = new FormData();
     formData.append('file', file);
+
+    // 如果是文档文件，提取文本内容
+    if (isDocument) {
+      try {
+        let textContent = '';
+
+        if (isTxt || isMd) {
+          // txt 和 md 文件直接读取
+          textContent = await file.text();
+        } else if (isDocx) {
+          // docx 文件需要解析
+          textContent = await extractDocxText(file);
+        } else if (isPdf) {
+          // pdf 文件需要解析
+          textContent = await extractPdfText(file);
+        } else if (isExcel) {
+          // excel 文件需要解析
+          textContent = await extractExcelText(file);
+        }
+
+        // 限制文本长度
+        if (textContent.length > 50000) {
+          textContent = textContent.substring(0, 50000) + '...(内容过长已截断)';
+        }
+
+        formData.append('textContent', textContent);
+      } catch (err) {
+        console.error('Extract text error:', err);
+        dialog.showError(`文件 ${file.name} 内容提取失败`);
+        continue;
+      }
+    }
 
     try {
       const res = await fetch(`${config.public.apiBase}/api/files/upload`, {
@@ -1254,13 +1393,13 @@ const handleFileUpload = async (e) => {
       const data = await res.json();
 
       if (data.success) {
-        const isImage = file.type.startsWith('image/');
         uploadedFiles.value.push({
           id: data.data.id,
           name: data.data.filename,
           url: data.data.url,
-          type: isImage ? 'image' : 'document',
+          type: data.data.type,
           size: data.data.size,
+          content: data.data.content,
         });
       } else {
         dialog.showError(`上传 ${file.name} 失败`);
@@ -1276,7 +1415,98 @@ const handleFileUpload = async (e) => {
   if (fileInput.value) fileInput.value.value = '';
 };
 
-const removeFile = (index) => {
+// 提取 docx 文件文本内容
+const extractDocxText = async (file) => {
+  try {
+    const JSZip = await import('jszip').then(m => m.default);
+    const arrayBuffer = await file.arrayBuffer();
+    const zip = await JSZip.loadAsync(arrayBuffer);
+
+    // 读取 word/document.xml
+    const documentXml = await zip.file('word/document.xml')?.async('string');
+    if (!documentXml) {
+      return '';
+    }
+
+    // 使用正则提取所有 <w:t> 标签中的文本
+    const textMatches = documentXml.match(/<w:t[^>]*>([^<]*)<\/w:t>/g);
+    if (textMatches) {
+      return textMatches
+        .map(match => match.replace(/<w:t[^>]*>|<\/w:t>/g, ''))
+        .join('');
+    }
+    return '';
+  } catch (err) {
+    console.error('Extract docx error:', err);
+    return '';
+  }
+};
+
+// 提取 pdf 文件文本内容
+const extractPdfText = async (file) => {
+  try {
+    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    const arrayBuffer = await file.arrayBuffer();
+
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let textContent = '';
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const pageText = content.items.map(item => item.str).join(' ');
+      textContent += pageText + '\n';
+    }
+
+    return textContent;
+  } catch (err) {
+    console.error('Extract pdf error:', err);
+    return '';
+  }
+};
+
+// 提取 excel 文件文本内容
+const extractExcelText = async (file) => {
+  try {
+    const XLSX = await import('xlsx').then(m => m.default);
+    const arrayBuffer = await file.arrayBuffer();
+
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    let textContent = '';
+
+    for (const sheetName of workbook.SheetNames) {
+      const sheet = workbook.Sheets[sheetName];
+      const csv = XLSX.utils.sheet_to_csv(sheet);
+      textContent += `【工作表: ${sheetName}】\n${csv}\n\n`;
+    }
+
+    return textContent;
+  } catch (err) {
+    console.error('Extract excel error:', err);
+    return '';
+  }
+};
+
+const removeFile = async (index) => {
+  const file = uploadedFiles.value[index];
+  if (!file) return;
+
+  // 如果文件已上传到服务器（有 id），则从服务器删除
+  if (file.id) {
+    try {
+      const res = await fetchAPI(`/api/files/${file.id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!data.success) {
+        console.error('Delete file error:', data.error);
+      }
+    } catch (err) {
+      console.error('Delete file error:', err);
+    }
+  }
+
+  // 从本地列表中移除
   uploadedFiles.value.splice(index, 1);
 };
 
@@ -1297,6 +1527,7 @@ const sendMessage = async () => {
     type: f.type,
     url: f.url,
     name: f.name,
+    content: f.content, // 文档文件的文本内容
   }));
 
   // 清空已上传文件
@@ -2624,6 +2855,16 @@ const closeImagePreview = () => {
   border-color: rgba(255, 255, 255, 0.1);
 }
 
+.file-preview-image-wrapper {
+  position: relative;
+}
+
+.file-preview-image-wrapper .file-remove-btn {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+}
+
 .file-preview-document {
   display: flex;
   align-items: center;
@@ -2633,11 +2874,37 @@ const closeImagePreview = () => {
   border-radius: 8px;
   font-size: 13px;
   color: #1a1a1a;
+  transition: background 0.2s;
+}
+
+.file-preview-document:hover {
+  background: #ebebef;
 }
 
 .dark .file-preview-document {
   background: #3a3b41;
   color: #ffffff;
+}
+
+.dark .file-preview-document:hover {
+  background: #4a4b51;
+}
+
+.file-preview-document .file-icon {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.file-preview-document .file-name {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
 }
 
 .file-preview-document span {
@@ -2732,6 +2999,56 @@ const closeImagePreview = () => {
 }
 
 /* Action Buttons */
+.upload-btn-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.upload-btn-wrapper:hover .upload-hint {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(0);
+}
+
+.upload-hint {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%) translateX(-5px);
+  margin-left: 8px;
+  padding: 6px 10px;
+  background: #1a1a1a;
+  color: #ffffff;
+  font-size: 11px;
+  border-radius: 6px;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.upload-hint::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 4px solid transparent;
+  border-right-color: #1a1a1a;
+}
+
+.dark .upload-hint {
+  background: #ffffff;
+  color: #1a1a1a;
+}
+
+.dark .upload-hint::before {
+  border-right-color: #ffffff;
+}
+
 .input-action-btn {
   width: 36px;
   height: 36px;
@@ -3121,6 +3438,65 @@ const closeImagePreview = () => {
 
 .message-image:hover {
   transform: scale(1.02);
+}
+
+/* Message Document - 文档附件样式 */
+.message-document {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f5f5f7;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-bottom: 4px;
+}
+
+.dark .message-document {
+  background: #3a3b41;
+}
+
+.message-document:hover {
+  background: #ebebef;
+}
+
+.dark .message-document:hover {
+  background: #4a4b51;
+}
+
+.message-document .document-icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #007aff;
+}
+
+.message-document .document-name {
+  font-size: 13px;
+  color: #1a1a1a;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dark .message-document .document-name {
+  color: #ffffff;
+}
+
+.message-document .document-download {
+  flex-shrink: 0;
+  opacity: 0.5;
+  color: #6e6e80;
+  transition: opacity 0.2s;
+}
+
+.message-document:hover .document-download {
+  opacity: 1;
 }
 
 /* Image Preview Modal */
