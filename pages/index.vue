@@ -649,45 +649,39 @@
               <!-- 图片预览 -->
               <div v-if="file.type === 'image'" class="file-preview-image-wrapper">
                 <img :src="getFileUrl(file.url)" class="file-preview-image" />
-                <button class="file-remove-btn" @click="removeFile(index)" title="移除">
-                  <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="image-overlay"></div>
+                <button class="file-remove-btn image-remove" @click="removeFile(index)" title="移除">
+                  <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
               <!-- 文档预览 -->
-              <div v-else class="file-preview-document">
-                <div class="file-icon">
-                  <!-- PDF 图标 -->
-                  <svg v-if="getFileExtension(file.name) === 'pdf'" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    <text x="8" y="15" font-size="6" fill="currentColor" font-weight="bold">PDF</text>
-                  </svg>
-                  <!-- Word 图标 -->
-                  <svg v-else-if="getFileExtension(file.name) === 'docx'" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6M9 15h4" />
-                  </svg>
-                  <!-- Excel 图标 -->
-                  <svg v-else-if="['xlsx', 'xls'].includes(getFileExtension(file.name))" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 10h2M13 10h2M9 14h2M13 14h2" />
-                  </svg>
-                  <!-- TXT 图标 -->
-                  <svg v-else-if="getFileExtension(file.name) === 'txt'" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6M9 16h6M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                  </svg>
-                  <!-- MD 图标 -->
-                  <svg v-else-if="getFileExtension(file.name) === 'md'" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 13l2 2 4-4" />
-                  </svg>
-                  <!-- 默认文档图标 -->
-                  <svg v-else width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
+              <div v-else class="file-preview-document" :title="file.name">
+                <!-- PDF 图标 -->
+                <div v-if="getFileExtension(file.name) === 'pdf'" class="file-icon pdf">
+                  <span class="icon-label">PDF</span>
                 </div>
-                <span class="file-name" :title="file.name">{{ file.name }}</span>
+                <!-- Word 图标 -->
+                <div v-else-if="getFileExtension(file.name) === 'docx'" class="file-icon word">
+                  <span class="icon-label">W</span>
+                </div>
+                <!-- Excel 图标 -->
+                <div v-else-if="['xlsx', 'xls'].includes(getFileExtension(file.name))" class="file-icon excel">
+                  <span class="icon-label">X</span>
+                </div>
+                <!-- TXT 图标 -->
+                <div v-else-if="getFileExtension(file.name) === 'txt'" class="file-icon txt">
+                  <span class="icon-label">TXT</span>
+                </div>
+                <!-- MD 图标 -->
+                <div v-else-if="getFileExtension(file.name) === 'md'" class="file-icon md">
+                  <span class="icon-label">MD</span>
+                </div>
+                <!-- 默认文档图标 -->
+                <div v-else class="file-icon default">
+                  <span class="icon-label">文件</span>
+                </div>
                 <button class="file-remove-btn" @click.stop="removeFile(index)" title="移除">
                   <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -1340,6 +1334,20 @@ const handleFileUpload = async (e) => {
       continue;
     }
 
+    // 检查是否已上传图片，如果已上传图片则不能上传文档
+    const hasImage = uploadedFiles.value.some(f => f.type === 'image');
+    if (hasImage && isDocument) {
+      dialog.showError(`已上传图片，不能同时上传文档文件。请先移除图片后再上传文档`);
+      continue;
+    }
+
+    // 检查是否已上传文档，如果已上传文档则不能上传图片
+    const hasDocument = uploadedFiles.value.some(f => f.type === 'document');
+    if (hasDocument && isImage) {
+      dialog.showError(`已上传文档文件，不能同时上传图片。请先移除文档后再上传图片`);
+      continue;
+    }
+
     // 检查文件大小 (最大 10MB)
     if (file.size > 10 * 1024 * 1024) {
       dialog.showError(`文件 ${file.name} 超过 10MB 限制`);
@@ -1955,6 +1963,7 @@ const saveMessageEdit = async (index) => {
     }
 
     // 更新本地消息内容
+    // 注意：metadata 已在数据库中保留，前端本地消息也已有 metadata（附件信息）
     messages.value[index].content = newContent;
 
     // 取消编辑模式
@@ -2832,7 +2841,7 @@ const closeImagePreview = () => {
 /* File Preview */
 .file-preview-area {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
   margin-bottom: 12px;
 }
@@ -2843,38 +2852,77 @@ const closeImagePreview = () => {
   align-items: center;
 }
 
-.file-preview-image {
-  width: 56px;
-  height: 56px;
-  object-fit: cover;
-  border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-}
-
-.dark .file-preview-image {
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
+/* 图片预览样式 */
 .file-preview-image-wrapper {
   position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
-.file-preview-image-wrapper .file-remove-btn {
+.file-preview-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-overlay {
   position: absolute;
-  top: -4px;
-  right: -4px;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 60%, rgba(0,0,0,0.4) 100%);
+  opacity: 0;
+  transition: opacity 0.2s;
 }
 
-.file-preview-document {
+.file-preview-image-wrapper:hover .image-overlay {
+  opacity: 1;
+}
+
+.file-remove-btn.image-remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  background: rgba(0, 0, 0, 0.6);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
+  justify-content: center;
+  color: white;
+  opacity: 0;
+  transition: all 0.2s;
+}
+
+.file-preview-image-wrapper:hover .file-remove-btn.image-remove {
+  opacity: 1;
+}
+
+.file-remove-btn.image-remove:hover {
+  background: rgba(255, 60, 60, 0.9);
+  transform: scale(1.1);
+}
+
+.dark .file-preview-image-wrapper {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+/* 文档预览样式 */
+.file-preview-document {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 12px;
   background: #f5f5f7;
-  border-radius: 8px;
-  font-size: 13px;
-  color: #1a1a1a;
-  transition: background 0.2s;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
 .file-preview-document:hover {
@@ -2883,35 +2931,79 @@ const closeImagePreview = () => {
 
 .dark .file-preview-document {
   background: #3a3b41;
-  color: #ffffff;
 }
 
 .dark .file-preview-document:hover {
   background: #4a4b51;
 }
 
-.file-preview-document .file-icon {
-  flex-shrink: 0;
-  width: 24px;
-  height: 24px;
+.file-icon {
+  width: 48px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: 10px;
+  background: #8e8e93;
 }
 
-.file-preview-document .file-name {
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
+.file-icon.pdf {
+  background: linear-gradient(135deg, #ff5252 0%, #ff1744 100%);
 }
 
-.file-preview-document span {
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.file-icon.word {
+  background: linear-gradient(135deg, #2196f3 0%, #1565c0 100%);
+}
+
+.file-icon.excel {
+  background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
+}
+
+.file-icon.txt {
+  background: linear-gradient(135deg, #78909c 0%, #546e7a 100%);
+}
+
+.file-icon.md {
+  background: linear-gradient(135deg, #42a5f5 0%, #1976d2 100%);
+}
+
+.file-icon.default {
+  background: linear-gradient(135deg, #9e9e9e 0%, #757575 100%);
+}
+
+.icon-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: white;
+  letter-spacing: 0.5px;
+  text-align: center;
+}
+
+.file-preview-document .file-remove-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  transition: all 0.2s;
+  opacity: 0;
+}
+
+.file-preview-document:hover .file-remove-btn {
+  opacity: 1;
+}
+
+.file-preview-document .file-remove-btn:hover {
+  background: #ff3b30;
+  transform: scale(1.1);
 }
 
 .file-remove-btn {
