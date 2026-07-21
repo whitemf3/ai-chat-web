@@ -1033,10 +1033,18 @@ const loadConversations = async () => {
     if (data.success) {
       conversations.value = data.data;
 
-      // 如果有对话，自动选中并加载最新的对话
+      // 如果有对话，根据 URL 参数或选择最新的对话
       if (data.data.length > 0) {
-        const latestConversation = data.data[0]; // 列表已按 updated_at DESC 排序
-        await selectConversation(latestConversation.id);
+        // 从 URL 获取对话 ID
+        const urlConversationId = window.location.hash.slice(1); // 去掉 # 号
+        if (urlConversationId && data.data.some(c => c.id === urlConversationId)) {
+          // URL 中有有效的对话 ID，加载该对话
+          await selectConversation(urlConversationId, false);
+        } else {
+          // URL 中没有对话 ID 或无效，加载最新的对话
+          const latestConversation = data.data[0];
+          await selectConversation(latestConversation.id, true);
+        }
       }
     }
   } catch (err) {
@@ -1059,6 +1067,7 @@ const createNewChat = async () => {
       if (data.success && data.data.length === 0) {
         // 找到空对话，选中它
         currentConversationId.value = emptyConv.id;
+        window.location.hash = emptyConv.id;
         messages.value = [];
         return;
       }
@@ -1076,6 +1085,7 @@ const createNewChat = async () => {
     const data = await res.json();
     if (data.success) {
       currentConversationId.value = data.data.id;
+      window.location.hash = data.data.id;
       messages.value = [];
       conversations.value.unshift(data.data);
     }
@@ -1084,8 +1094,14 @@ const createNewChat = async () => {
   }
 };
 
-const selectConversation = async (id) => {
+const selectConversation = async (id, updateUrl = true) => {
   currentConversationId.value = id;
+
+  // 更新 URL hash
+  if (updateUrl) {
+    window.location.hash = id;
+  }
+
   try {
     const res = await fetchAPI(`/api/chat/conversations/${id}/messages`);
     const data = await res.json();
@@ -1126,10 +1142,11 @@ const deleteConversation = async (id) => {
     if (data.success) {
       conversations.value = conversations.value.filter(c => c.id !== id);
 
-      // 如果删除的是当前对话，清空消息
+      // 如果删除的是当前对话，清空消息并清除 URL
       if (currentConversationId.value === id) {
         currentConversationId.value = null;
         messages.value = [];
+        window.location.hash = '';
       }
     }
   } catch (err) {
