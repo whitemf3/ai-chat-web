@@ -1334,36 +1334,45 @@ const sendMessage = async () => {
 
       for (const line of lines) {
         if (line.startsWith('data: ')) {
-          const data = JSON.parse(line.substring(6));
-          if (data.type === 'start') {
-            // 收到 start 事件，更新消息的真实 ID
-            // 1. 更新用户消息 ID
-            if (data.user_message_id) {
-              const userMsgIndex = messages.value.findIndex(m => m.id === tempUserMsgId);
-              if (userMsgIndex !== -1) {
-                messages.value[userMsgIndex].id = data.user_message_id;
+          try {
+            const data = JSON.parse(line.substring(6));
+            if (data.type === 'start') {
+              // 收到 start 事件，更新消息的真实 ID
+              // 1. 更新用户消息 ID
+              if (data.user_message_id) {
+                const userMsgIndex = messages.value.findIndex(m => m.id === tempUserMsgId);
+                if (userMsgIndex !== -1) {
+                  messages.value[userMsgIndex].id = data.user_message_id;
+                }
               }
-            }
-            // 2. 更新 AI 消息 ID
-            if (data.message_id) {
-              const aiMsgIndex = messages.value.findIndex(m => m.id === tempAiMsgId);
-              if (aiMsgIndex !== -1) {
-                messages.value[aiMsgIndex].id = data.message_id;
-                currentStreamingMessageId.value = data.message_id;
+              // 2. 更新 AI 消息 ID
+              if (data.message_id) {
+                const aiMsgIndex = messages.value.findIndex(m => m.id === tempAiMsgId);
+                if (aiMsgIndex !== -1) {
+                  messages.value[aiMsgIndex].id = data.message_id;
+                  currentStreamingMessageId.value = data.message_id;
+                }
               }
+              realMessageCreated = true;
+            } else if (data.type === 'chunk') {
+              // 找到当前正在流式传输的消息并追加内容
+              const msgIndex = messages.value.findIndex(m => m.id === currentStreamingMessageId.value);
+              if (msgIndex !== -1) {
+                messages.value[msgIndex].content += data.content;
+                scrollToBottom();
+              }
+            } else if (data.type === 'error') {
+              // AI 生成错误
+              throw new Error(formatAIError(data.message));
+            } else if (data.type === 'done') {
+              // 生成完成
+              stoppedMessages.value.delete(currentStreamingMessageId.value);
+              currentStreamingMessageId.value = null;
             }
-            realMessageCreated = true;
-          } else if (data.type === 'chunk') {
-            // 找到当前正在流式传输的消息并追加内容
-            const msgIndex = messages.value.findIndex(m => m.id === currentStreamingMessageId.value);
-            if (msgIndex !== -1) {
-              messages.value[msgIndex].content += data.content;
-              scrollToBottom();
-            }
-          } else if (data.type === 'done') {
-            // 生成完成
-            stoppedMessages.value.delete(currentStreamingMessageId.value);
-            currentStreamingMessageId.value = null;
+          } catch (parseError) {
+            // JSON 解析错误，可能是数据不完整
+            console.warn('Parse SSE data error:', parseError, 'Raw:', line);
+            // 继续处理其他行，不中断
           }
         }
       }
@@ -1507,12 +1516,21 @@ const continueGeneration = async (messageIndex) => {
             if (data.type === 'chunk') {
               messages.value[messageIndex].content += data.content;
               scrollToBottom();
+            } else if (data.type === 'error') {
+              // AI 生成错误
+              throw new Error(formatAIError(data.message));
             } else if (data.type === 'done') {
               // 从停止集合中移除
               stoppedMessages.value.delete(msg.id);
             }
-          } catch (e) {
-            // 忽略解析错误
+          } catch (parseError) {
+            // JSON 解析错误或业务错误
+            if (parseError.message && !parseError.message.includes('JSON')) {
+              // 业务错误（来自 error 类型），向上抛出
+              throw parseError;
+            }
+            // JSON 解析错误，记录日志继续处理
+            console.warn('Parse SSE data error:', parseError, 'Raw:', line);
           }
         }
       }
@@ -1520,10 +1538,26 @@ const continueGeneration = async (messageIndex) => {
 
   } catch (err) {
     console.error('Continue generation error:', err);
-    await dialog.showError('继续生成失败');
+    await dialog.showError(err.message || '继续生成失败，请稍后重试');
   } finally {
     isContinuing.value = false;
   }
+};
+
+// 格式化 AI 错误消息
+const formatAIError = (errorMessage) => {
+  if (!errorMessage) return 'AI 生成失败，请稍后重试';
+  // 提取更友好的错误信息
+  if (errorMessage.includes('internal error')) {
+    return 'AI 服务暂时不可用，请稍后重试';
+  } else if (errorMessage.includes('rate limit') || errorMessage.includes('429')) {
+    return '请求过于频繁，请稍后再试';
+  } else if (errorMessage.includes('timeout') || errorMessage.includes('ETIMEDOUT')) {
+    return '请求超时，请重试';
+  } else if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
+    return '网络连接失败，请检查网络后重试';
+  }
+  return errorMessage;
 };
 
 // 复制消息
@@ -1571,13 +1605,25 @@ const regenerateMessage = async (messageIndex) => {
     const isTempMessage = aiMsg.id.toString().startsWith('temp-');
     const isEmptyMessage = !aiMsg.content;
 
+    if (!isTempMessage && !isEmptyMessage) {
+      // 调用后端 API 删除该 AI 回复及之后的所有消息
+      const res = await fetchAPI(`/api/chat/conversations/${currentConversationId.value}/messages/${aiMsg.id}`, {
+        method: 'DELETE',
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        await dialog.showError(data.error.message || '重新生成失败');
+        isRegenerating.value = false;
+        return;
+      }
+    }
+
     // 删除本地消息（从该 AI 回复开始到末尾）
     messages.value.splice(messageIndex);
 
-    // 使用 generateAIResponse 重新生成，传递 regenerate_from 参数
-    // 后端会在生成前先删除该消息及之后的所有消息（原子操作，避免竞态条件）
-    const regenerateFrom = (!isTempMessage && !isEmptyMessage) ? aiMsg.id : null;
-    await generateAIResponse(regenerateFrom);
+    // 使用 generateAIResponse 重新生成（不重复保存用户消息）
+    await generateAIResponse();
 
   } catch (err) {
     console.error('Regenerate error:', err);
@@ -1650,7 +1696,6 @@ const saveMessageEdit = async (index) => {
     }
 
     // 如果是用户消息，重新生成 AI 回复
-    // 注意：后端已经在 PUT 请求中删除了后续消息，这里不需要传 regenerate_from
     if (msg.role === 'user') {
       await generateAIResponse();
     }
@@ -1664,39 +1709,25 @@ const saveMessageEdit = async (index) => {
 };
 
 // 生成AI回复（不保存用户消息）
-const generateAIResponse = async (regenerateFrom = null) => {
+const generateAIResponse = async () => {
   if (!currentConversationId.value) return;
 
   isStreaming.value = true;
+  currentStreamingMessageId.value = null;
 
-  // 先创建临时 AI 消息用于显示思考状态
+  // 不再预先创建临时消息，等收到 start 事件后再创建
   const tempAiMsgId = `temp-regen-${Date.now()}`;
-  messages.value.push({
-    id: tempAiMsgId,
-    role: 'assistant',
-    content: '',
-    created_at: new Date().toISOString(),
-  });
-  currentStreamingMessageId.value = tempAiMsgId;
 
   try {
-    // 构建请求体
-    const requestBody = {
-      stream: true,
-    };
-
-    // 如果是重新生成，传递 regenerate_from 参数
-    if (regenerateFrom) {
-      requestBody.regenerate_from = regenerateFrom;
-    }
-
     // 使用 /generate 接口，只生成AI回复，不保存用户消息
     const response = await fetchAPI(`/api/chat/conversations/${currentConversationId.value}/generate`, {
       method: 'POST',
       headers: {
         'Accept': 'text/event-stream',
       },
-      body: JSON.stringify(requestBody),
+      body: JSON.stringify({
+        stream: true,
+      }),
     });
 
     // 检查 HTTP 响应状态
@@ -1707,6 +1738,8 @@ const generateAIResponse = async (regenerateFrom = null) => {
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
+
+    let messageCreated = false;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -1721,37 +1754,53 @@ const generateAIResponse = async (regenerateFrom = null) => {
             const data = JSON.parse(line.slice(6));
 
             if (data.type === 'start') {
-              // 更新 AI 消息的真实 ID
+              // 收到 start 事件后才创建消息
               const realMessageId = data.message_id;
-              const aiMsgIndex = messages.value.findIndex(m => m.id === tempAiMsgId);
-              if (aiMsgIndex !== -1) {
-                messages.value[aiMsgIndex].id = realMessageId;
-                currentStreamingMessageId.value = realMessageId;
-              }
+              messages.value.push({
+                id: realMessageId,
+                role: 'assistant',
+                content: '',
+                created_at: new Date().toISOString(),
+              });
+              currentStreamingMessageId.value = realMessageId;
+              messageCreated = true;
             } else if (data.type === 'chunk') {
               // 找到当前消息并追加内容
-              const aiMsgIndex = messages.value.findIndex(m => m.id === currentStreamingMessageId.value);
-              if (aiMsgIndex !== -1) {
-                messages.value[aiMsgIndex].content += data.content;
-                scrollToBottom();
+              if (currentStreamingMessageId.value) {
+                const aiMsgIndex = messages.value.findIndex(m => m.id === currentStreamingMessageId.value);
+                if (aiMsgIndex !== -1) {
+                  messages.value[aiMsgIndex].content += data.content;
+                  scrollToBottom();
+                }
               }
+            } else if (data.type === 'error') {
+              // AI 生成错误
+              throw new Error(formatAIError(data.message));
             } else if (data.type === 'done') {
               // 生成完成
               stoppedMessages.value.delete(currentStreamingMessageId.value);
               currentStreamingMessageId.value = null;
             }
-          } catch (e) {
-            // 忽略解析错误
+          } catch (parseError) {
+            // JSON 解析错误或业务错误
+            if (parseError.message && !parseError.message.includes('JSON')) {
+              // 业务错误（来自 error 类型），向上抛出
+              throw parseError;
+            }
+            // JSON 解析错误，记录日志继续处理
+            console.warn('Parse SSE data error:', parseError, 'Raw:', line);
           }
         }
       }
     }
 
   } catch (err) {
-    // 删除临时 AI 消息
-    const aiMsgIndex = messages.value.findIndex(m => m.id === tempAiMsgId);
-    if (aiMsgIndex !== -1) {
-      messages.value.splice(aiMsgIndex, 1);
+    // 删除临时 AI 消息（如果已创建）
+    if (currentStreamingMessageId.value) {
+      const aiMsgIndex = messages.value.findIndex(m => m.id === currentStreamingMessageId.value);
+      if (aiMsgIndex !== -1) {
+        messages.value.splice(aiMsgIndex, 1);
+      }
     }
     currentStreamingMessageId.value = null;
 
