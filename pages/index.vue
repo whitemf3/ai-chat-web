@@ -272,6 +272,18 @@
         <!-- User Menu Popup -->
         <div v-if="showUserMenu" class="user-menu-overlay" @click="showUserMenu = false"></div>
         <div v-if="showUserMenu" class="user-menu" @click.stop>
+          <!-- 额度显示 -->
+          <div class="menu-quota">
+            <div class="quota-label">今日额度</div>
+            <div class="quota-bar">
+              <div class="quota-used" :style="{ width: quotaPercent + '%' }"></div>
+            </div>
+            <div class="quota-info">
+              <span>{{ quotaUsed.toLocaleString() }} / {{ quotaLimit > 0 ? quotaLimit.toLocaleString() : '无限制' }}</span>
+              <span v-if="quotaLimit > 0">{{ quotaPercent.toFixed(1) }}%</span>
+            </div>
+          </div>
+          <div class="menu-divider"></div>
           <div class="menu-item" @click="openAccountModal">
             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -892,6 +904,17 @@ const renameConversationId = ref(null);
 const renameTitle = ref('');
 const renameInput = ref(null);
 
+// Quota State
+const quotaLimit = ref(10000);
+const quotaUsed = ref(0);
+const quotaUnlimited = ref(false);
+
+// 计算额度百分比
+const quotaPercent = computed(() => {
+  if (quotaUnlimited.value || quotaLimit.value <= 0) return 0;
+  return Math.min(100, (quotaUsed.value / quotaLimit.value) * 100);
+});
+
 // Dialog
 const dialog = useDialog();
 
@@ -1039,6 +1062,7 @@ onMounted(() => {
 
   loadConversations();
   loadWorkflows();
+  fetchQuota(); // 获取用户额度
 });
 
 // API Methods
@@ -1116,6 +1140,21 @@ const loadConversations = async () => {
     }
   } catch (err) {
     console.error('Load conversations error:', err);
+  }
+};
+
+// 获取用户额度
+const fetchQuota = async () => {
+  try {
+    const res = await fetchAPI('/api/user/quota');
+    const data = await res.json();
+    if (data.success) {
+      quotaLimit.value = data.data.dailyLimit;
+      quotaUsed.value = data.data.usedToday;
+      quotaUnlimited.value = data.data.unlimited;
+    }
+  } catch (err) {
+    console.error('Fetch quota error:', err);
   }
 };
 
@@ -1615,6 +1654,10 @@ const sendMessage = async () => {
     // 检查 HTTP 响应状态
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}));
+      // 特殊处理额度不足错误
+      if (res.status === 429 && errorData.error?.code === 'QUOTA_EXCEEDED') {
+        throw new Error('今日额度已用完，请明天UTC 00:00重置后再试');
+      }
       throw new Error(errorData.error?.message || `请求失败 (${res.status})`);
     }
 
@@ -1741,6 +1784,8 @@ const sendMessage = async () => {
   } finally {
     isStreaming.value = false;
     abortController.value = null;
+    // 刷新额度
+    fetchQuota();
   }
 };
 
@@ -2460,6 +2505,54 @@ const closeImagePreview = () => {
 
 .dark .user-menu .menu-divider {
   background: #3a3b41;
+}
+
+.user-menu .menu-quota {
+  padding: 12px 14px;
+}
+
+.user-menu .quota-label {
+  font-size: 11px;
+  color: #8e8e93;
+  margin-bottom: 6px;
+}
+
+.dark .user-menu .quota-label {
+  color: #98989d;
+}
+
+.user-menu .quota-bar {
+  height: 6px;
+  background: #e5e5e5;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.dark .user-menu .quota-bar {
+  background: #3a3b41;
+}
+
+.user-menu .quota-used {
+  height: 100%;
+  background: linear-gradient(90deg, #34c759 0%, #30d158 100%);
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+
+.user-menu .quota-used.full {
+  background: linear-gradient(90deg, #ff9500 0%, #ff3b30 100%);
+}
+
+.user-menu .quota-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #8e8e93;
+}
+
+.dark .user-menu .quota-info {
+  color: #98989d;
 }
 
 .rename-dialog-overlay {
