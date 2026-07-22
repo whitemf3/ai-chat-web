@@ -1297,15 +1297,29 @@ const getFileExtension = (filename) => {
 };
 
 // 下载文件
-const downloadFile = (file) => {
-  const url = getFileUrl(file.url);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = file.name || 'download';
-  link.target = '_blank';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+const downloadFile = async (file) => {
+  try {
+    const url = getFileUrl(file.url);
+    // 使用 fetch 获取文件，确保正确处理 blob
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error('下载失败');
+    }
+    const blob = await response.blob();
+    // 创建下载链接
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = file.name || 'download';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    // 释放 blob URL
+    URL.revokeObjectURL(blobUrl);
+  } catch (error) {
+    console.error('Download error:', error);
+    dialog.showError('文件下载失败');
+  }
 };
 
 const triggerFileUpload = () => {
@@ -1426,7 +1440,8 @@ const handleFileUpload = async (e) => {
 // 提取 docx 文件文本内容
 const extractDocxText = async (file) => {
   try {
-    const JSZip = await import('jszip').then(m => m.default);
+    const JSZip = await import('jszip');
+
     const arrayBuffer = await file.arrayBuffer();
     const zip = await JSZip.loadAsync(arrayBuffer);
 
@@ -1453,16 +1468,33 @@ const extractDocxText = async (file) => {
 // 提取 pdf 文件文本内容
 const extractPdfText = async (file) => {
   try {
-    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    // pdfjs-dist v4 的标准导入
+    const pdfjsLib = await import('pdfjs-dist');
+
+    // 设置 worker 源（使用 CDN 或禁用 worker）
+    // 方案1: 使用 CDN
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
+
     const arrayBuffer = await file.arrayBuffer();
 
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    // v4 API: 使用 getDocument
+    const loadingTask = pdfjsLib.getDocument({
+      data: arrayBuffer,
+      useSystemFonts: true,
+    });
+    const pdf = await loadingTask.promise;
     let textContent = '';
 
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const content = await page.getTextContent();
-      const pageText = content.items.map(item => item.str).join(' ');
+      // v4 中 items 可能包含 str 属性或其他类型
+      const pageText = content.items
+        .map(item => {
+          if ('str' in item) return item.str;
+          return '';
+        })
+        .join(' ');
       textContent += pageText + '\n';
     }
 
@@ -1476,9 +1508,9 @@ const extractPdfText = async (file) => {
 // 提取 excel 文件文本内容
 const extractExcelText = async (file) => {
   try {
-    const XLSX = await import('xlsx').then(m => m.default);
-    const arrayBuffer = await file.arrayBuffer();
+    const XLSX = await import('xlsx');
 
+    const arrayBuffer = await file.arrayBuffer();
     const workbook = XLSX.read(arrayBuffer, { type: 'array' });
     let textContent = '';
 

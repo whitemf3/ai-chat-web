@@ -33,4 +33,16 @@ export default defineNuxtConfig({
   typescript: {
     typeCheck: false,
   },
+
+  // 配置 Vite 处理 pdfjs-dist
+  vite: {
+    optimizeDeps: {
+      include: ['pdfjs-dist'],
+    },
+  },
+
+  // 配置构建时排除不需要的依赖
+  build: {
+    transpile: ['pdfjs-dist'],
+  },
 });
