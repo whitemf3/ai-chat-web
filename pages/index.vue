@@ -555,33 +555,36 @@
                       v-for="(attachment, idx) in msg.metadata.attachments.filter(a => a.type === 'document')"
                       :key="'doc-' + idx"
                       class="message-document"
-                      @click="downloadFile(attachment)"
                     >
-                      <div class="document-icon">
-                        <!-- PDF 图标 -->
-                        <svg v-if="getFileExtension(attachment.name) === 'pdf'" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                          <text x="8" y="15" font-size="5" fill="currentColor" font-weight="bold">PDF</text>
-                        </svg>
-                        <!-- Word 图标 -->
-                        <svg v-else-if="getFileExtension(attachment.name) === 'docx'" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6M9 15h4" />
-                        </svg>
-                        <!-- Excel 图标 -->
-                        <svg v-else-if="['xlsx', 'xls'].includes(getFileExtension(attachment.name))" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 10h2M13 10h2M9 14h2M13 14h2" />
-                        </svg>
-                        <!-- 默认文档图标 -->
-                        <svg v-else width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
+                      <div class="document-info" @click="previewDocument(attachment)">
+                        <div class="document-icon">
+                          <!-- PDF 图标 -->
+                          <svg v-if="getFileExtension(attachment.name) === 'pdf'" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            <text x="8" y="15" font-size="5" fill="currentColor" font-weight="bold">PDF</text>
+                          </svg>
+                          <!-- Word 图标 -->
+                          <svg v-else-if="getFileExtension(attachment.name) === 'docx'" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6M9 15h4" />
+                          </svg>
+                          <!-- Excel 图标 -->
+                          <svg v-else-if="['xlsx', 'xls'].includes(getFileExtension(attachment.name))" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 10h2M13 10h2M9 14h2M13 14h2" />
+                          </svg>
+                          <!-- 默认文档图标 -->
+                          <svg v-else width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                        </div>
+                        <span class="document-name">{{ attachment.name || '文档' }}</span>
                       </div>
-                      <span class="document-name">{{ attachment.name || '文档' }}</span>
-                      <svg class="document-download" width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
+                      <button class="document-download-btn" @click.stop="downloadFile(attachment)" title="下载">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                      </button>
                     </div>
                   </div>
                   <!-- AI 消息内容为空时显示思考动画或错误 -->
@@ -872,6 +875,109 @@
             </svg>
           </button>
           <img :src="previewImageUrl" class="image-preview-img" @click.stop />
+        </div>
+      </div>
+    </Transition>
+
+    <!-- Document Preview Modal -->
+    <Transition name="fade">
+      <div v-if="showDocPreview" class="doc-preview-overlay" @click="closeDocPreview">
+        <div class="doc-preview-container" @click.stop>
+          <div class="doc-preview-header">
+            <h3 class="doc-preview-title">{{ previewDocName }}</h3>
+            <div class="doc-preview-actions">
+              <button class="doc-action-btn" @click="downloadFile(previewDocFile)" title="下载">
+                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              </button>
+              <button class="doc-action-btn" @click="closeDocPreview" title="关闭">
+                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="doc-preview-content">
+            <!-- PDF 预览 -->
+            <template v-if="getFileExtension(previewDocName) === 'pdf'">
+              <div v-if="docPreviewLoading" class="doc-preview-loading">
+                <div class="loading-spinner"></div>
+                <span>加载中...</span>
+              </div>
+              <div v-else-if="docPreviewError" class="doc-preview-error">
+                <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <p>{{ docPreviewError }}</p>
+                <button class="btn-download" @click="downloadFile(previewDocFile)">直接下载文件</button>
+              </div>
+              <div v-else class="pdf-preview" ref="pdfContainer"></div>
+            </template>
+            <!-- Excel 预览 -->
+            <template v-else-if="['xlsx', 'xls'].includes(getFileExtension(previewDocName))">
+              <div v-if="docPreviewLoading" class="doc-preview-loading">
+                <div class="loading-spinner"></div>
+                <span>加载中...</span>
+              </div>
+              <div v-else-if="docPreviewError" class="doc-preview-error">
+                <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <p>{{ docPreviewError }}</p>
+                <button class="btn-download" @click="downloadFile(previewDocFile)">直接下载文件</button>
+              </div>
+              <div v-else class="excel-preview" ref="excelContainer"></div>
+            </template>
+            <!-- Word 预览 -->
+            <template v-else-if="getFileExtension(previewDocName) === 'docx'">
+              <div v-if="docPreviewLoading" class="doc-preview-loading">
+                <div class="loading-spinner"></div>
+                <span>加载中...</span>
+              </div>
+              <div v-else-if="docPreviewError" class="doc-preview-error">
+                <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <p>{{ docPreviewError }}</p>
+                <button class="btn-download" @click="downloadFile(previewDocFile)">直接下载文件</button>
+              </div>
+              <div v-else class="word-preview" ref="wordContainer"></div>
+            </template>
+            <!-- Markdown 预览 -->
+            <template v-else-if="getFileExtension(previewDocName) === 'md'">
+              <div v-if="docPreviewLoading" class="doc-preview-loading">
+                <div class="loading-spinner"></div>
+                <span>加载中...</span>
+              </div>
+              <div v-else-if="docPreviewError" class="doc-preview-error">
+                <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <p>{{ docPreviewError }}</p>
+                <button class="btn-download" @click="downloadFile(previewDocFile)">直接下载文件</button>
+              </div>
+              <div v-else class="md-preview" ref="mdContainer"></div>
+            </template>
+            <!-- 纯文本预览 -->
+            <template v-else-if="getFileExtension(previewDocName) === 'txt'">
+              <div v-if="docPreviewLoading" class="doc-preview-loading">
+                <div class="loading-spinner"></div>
+                <span>加载中...</span>
+              </div>
+              <pre v-else class="text-preview">{{ docTextContent }}</pre>
+            </template>
+            <!-- 不支持预览 -->
+            <template v-else>
+              <div class="doc-preview-unsupported">
+                <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <p>此文件格式不支持在线预览</p>
+                <button class="btn-download" @click="downloadFile(previewDocFile)">下载文件</button>
+              </div>
+            </template>
+          </div>
         </div>
       </div>
     </Transition>
@@ -2428,6 +2534,255 @@ const closeImagePreview = () => {
   showImagePreview.value = false;
   previewImageUrl.value = '';
 };
+
+// 文档预览
+const showDocPreview = ref(false);
+const previewDocUrl = ref('');
+const previewDocName = ref('');
+const previewDocFile = ref(null);
+const docPreviewLoading = ref(false);
+const docPreviewError = ref('');
+const docTextContent = ref('');
+const excelContainer = ref(null);
+const wordContainer = ref(null);
+const pdfContainer = ref(null);
+const mdContainer = ref(null);
+
+// 等待容器可用的辅助函数
+const waitForContainer = async (containerRef, maxWait = 2000) => {
+  const startTime = Date.now();
+  while (!containerRef.value && Date.now() - startTime < maxWait) {
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  return containerRef.value;
+};
+
+// 预览文档
+const previewDocument = async (attachment) => {
+  previewDocFile.value = attachment;
+  previewDocName.value = attachment.name || '文档';
+  previewDocUrl.value = '';
+  docPreviewError.value = '';
+  docTextContent.value = '';
+
+  const ext = getFileExtension(attachment.name);
+  const url = getFileUrl(attachment.url);
+
+  // 先显示弹窗
+  showDocPreview.value = true;
+  docPreviewLoading.value = true;
+
+  // 等待弹窗 DOM 渲染
+  await nextTick();
+  await new Promise(resolve => setTimeout(resolve, 150));
+
+  try {
+    if (ext === 'pdf') {
+      await previewPDF(url);
+    } else if (['xlsx', 'xls'].includes(ext)) {
+      await previewExcel(url);
+    } else if (ext === 'docx') {
+      await previewWord(url);
+    } else if (ext === 'md') {
+      await previewMarkdown(url);
+    } else if (ext === 'txt') {
+      const response = await fetch(url);
+      docTextContent.value = await response.text();
+      docPreviewLoading.value = false;
+    } else {
+      docPreviewLoading.value = false;
+    }
+  } catch (error) {
+    console.error('Document preview error:', error);
+    docPreviewError.value = '预览加载失败: ' + error.message;
+    docPreviewLoading.value = false;
+  }
+};
+
+// PDF 预览
+const previewPDF = async (url) => {
+  try {
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    // 关闭 loading，让容器渲染出来
+    docPreviewLoading.value = false;
+    await nextTick();
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    const container = await waitForContainer(pdfContainer);
+    if (!container) {
+      throw new Error('容器初始化失败');
+    }
+
+    const response = await fetch(url);
+    const arrayBuffer = await response.arrayBuffer();
+    const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+    container.innerHTML = '';
+
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const scale = 1.2;
+      const viewport = page.getViewport({ scale });
+
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+      canvas.style.display = 'block';
+      canvas.style.margin = '10px auto';
+      canvas.style.maxWidth = '100%';
+      canvas.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+
+      await page.render({ canvasContext: context, viewport }).promise;
+      container.appendChild(canvas);
+    }
+  } catch (error) {
+    console.error('PDF preview error:', error);
+    docPreviewError.value = 'PDF 预览失败: ' + error.message;
+  }
+};
+
+// Excel 预览
+const previewExcel = async (url) => {
+  try {
+    await loadScript('https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js');
+
+    if (!window.XLSX) {
+      throw new Error('SheetJS 库加载失败');
+    }
+
+    // 关闭 loading，让容器渲染出来
+    docPreviewLoading.value = false;
+    await nextTick();
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    const container = await waitForContainer(excelContainer);
+    if (!container) {
+      throw new Error('容器初始化失败');
+    }
+
+    const response = await fetch(url);
+    const arrayBuffer = await response.arrayBuffer();
+    const workbook = window.XLSX.read(arrayBuffer, { type: 'array' });
+
+    container.innerHTML = '';
+
+    workbook.SheetNames.forEach((sheetName, index) => {
+      const sheet = workbook.Sheets[sheetName];
+      const html = window.XLSX.utils.sheet_to_html(sheet, { editable: false });
+
+      const sheetDiv = document.createElement('div');
+      sheetDiv.className = 'excel-sheet';
+      if (index > 0) sheetDiv.style.marginTop = '20px';
+
+      const sheetTitle = document.createElement('h4');
+      sheetTitle.className = 'sheet-title';
+      sheetTitle.textContent = sheetName;
+      sheetDiv.appendChild(sheetTitle);
+
+      const tableWrapper = document.createElement('div');
+      tableWrapper.className = 'table-wrapper';
+      tableWrapper.innerHTML = html;
+      sheetDiv.appendChild(tableWrapper);
+
+      container.appendChild(sheetDiv);
+    });
+  } catch (error) {
+    console.error('Excel preview error:', error);
+    docPreviewError.value = 'Excel 预览失败: ' + error.message;
+  }
+};
+
+// Word 预览
+const previewWord = async (url) => {
+  try {
+    await loadScript('https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js');
+
+    if (!window.mammoth) {
+      throw new Error('mammoth 库加载失败');
+    }
+
+    // 关闭 loading，让容器渲染出来
+    docPreviewLoading.value = false;
+    await nextTick();
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    const container = await waitForContainer(wordContainer);
+    if (!container) {
+      throw new Error('容器初始化失败');
+    }
+
+    const response = await fetch(url);
+    const arrayBuffer = await response.arrayBuffer();
+    const result = await window.mammoth.convertToHtml({ arrayBuffer });
+
+    container.innerHTML = result.value || '<p style="color: #8e8e93; text-align: center;">文档内容为空</p>';
+  } catch (error) {
+    console.error('Word preview error:', error);
+    docPreviewError.value = 'Word 预览失败: ' + error.message;
+  }
+};
+
+// Markdown 预览
+const previewMarkdown = async (url) => {
+  try {
+    await loadScript('https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js');
+
+    if (!window.marked) {
+      throw new Error('marked 库加载失败');
+    }
+
+    // 关闭 loading，让容器渲染出来
+    docPreviewLoading.value = false;
+    await nextTick();
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    const container = await waitForContainer(mdContainer);
+    if (!container) {
+      throw new Error('容器初始化失败');
+    }
+
+    const response = await fetch(url);
+    const markdownText = await response.text();
+
+    window.marked.setOptions({ breaks: true, gfm: true });
+    container.innerHTML = window.marked.parse(markdownText);
+  } catch (error) {
+    console.error('Markdown preview error:', error);
+    docPreviewError.value = 'Markdown 预览失败: ' + error.message;
+  }
+};
+
+// 动态加载 JS 脚本
+const loadScript = (src) => {
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${src}"]`);
+    if (existing) {
+      resolve();
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error(`加载脚本失败: ${src}`));
+    document.head.appendChild(script);
+  });
+};
+
+// 关闭文档预览
+const closeDocPreview = () => {
+  showDocPreview.value = false;
+  previewDocUrl.value = '';
+  previewDocName.value = '';
+  previewDocFile.value = null;
+  docPreviewLoading.value = false;
+  docPreviewError.value = '';
+  docTextContent.value = '';
+};
 </script>
 
 <style scoped>
@@ -3661,13 +4016,12 @@ const closeImagePreview = () => {
 .message-document {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
+  padding: 6px 8px 6px 12px;
   background: #f5f5f7;
   border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.2s;
   margin-bottom: 4px;
+  border: 1px solid transparent;
+  transition: all 0.2s;
 }
 
 .dark .message-document {
@@ -3676,10 +4030,21 @@ const closeImagePreview = () => {
 
 .message-document:hover {
   background: #ebebef;
+  border-color: rgba(0, 0, 0, 0.08);
 }
 
 .dark .message-document:hover {
   background: #4a4b51;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.message-document .document-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  flex: 1;
+  min-width: 0;
 }
 
 .message-document .document-icon {
@@ -3695,7 +4060,7 @@ const closeImagePreview = () => {
 .message-document .document-name {
   font-size: 13px;
   color: #1a1a1a;
-  max-width: 180px;
+  max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3705,15 +4070,30 @@ const closeImagePreview = () => {
   color: #ffffff;
 }
 
-.message-document .document-download {
+.message-document .document-download-btn {
   flex-shrink: 0;
-  opacity: 0.5;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
   color: #6e6e80;
-  transition: opacity 0.2s;
+  transition: all 0.2s;
+  margin-left: 4px;
 }
 
-.message-document:hover .document-download {
-  opacity: 1;
+.message-document .document-download-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: #1a1a1a;
+}
+
+.dark .message-document .document-download-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
 }
 
 /* Image Preview Modal */
@@ -3772,5 +4152,487 @@ const closeImagePreview = () => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* Document Preview Modal */
+.doc-preview-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+}
+
+.doc-preview-container {
+  position: relative;
+  width: 100%;
+  max-width: 1000px;
+  max-height: 90vh;
+  background: #ffffff;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dark .doc-preview-container {
+  background: #2a2b32;
+}
+
+.doc-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
+}
+
+.dark .doc-preview-header {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.doc-preview-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60%;
+}
+
+.dark .doc-preview-title {
+  color: #ffffff;
+}
+
+.doc-preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.doc-action-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #6e6e80;
+  transition: all 0.2s;
+}
+
+.doc-action-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #1a1a1a;
+}
+
+.dark .doc-action-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.doc-preview-content {
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
+  min-height: 300px;
+}
+
+/* PDF 预览 */
+.pdf-preview {
+  overflow: auto;
+  max-height: calc(90vh - 150px);
+  background: #525659;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.pdf-preview canvas {
+  display: block;
+  margin: 10px auto;
+  max-width: 100%;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+/* Markdown 预览 */
+.md-preview {
+  font-size: 14px;
+  line-height: 1.8;
+  color: #1a1a1a;
+  max-height: calc(90vh - 150px);
+  overflow: auto;
+}
+
+.dark .md-preview {
+  color: #cdd6f4;
+}
+
+.md-preview h1,
+.md-preview h2,
+.md-preview h3,
+.md-preview h4,
+.md-preview h5,
+.md-preview h6 {
+  margin: 24px 0 16px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.md-preview h1 { font-size: 28px; border-bottom: 1px solid #e5e5e5; padding-bottom: 8px; }
+.md-preview h2 { font-size: 24px; border-bottom: 1px solid #e5e5e5; padding-bottom: 6px; }
+.md-preview h3 { font-size: 20px; }
+.md-preview h4 { font-size: 16px; }
+
+.dark .md-preview h1,
+.dark .md-preview h2 {
+  border-color: #3a3a3c;
+}
+
+.md-preview p {
+  margin: 12px 0;
+}
+
+.md-preview ul,
+.md-preview ol {
+  margin: 12px 0;
+  padding-left: 24px;
+}
+
+.md-preview li {
+  margin: 4px 0;
+}
+
+.md-preview code {
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  background: #f5f5f7;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.dark .md-preview code {
+  background: #3a3b41;
+}
+
+.md-preview pre {
+  margin: 16px 0;
+  padding: 16px;
+  background: #f6f8fa;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+.dark .md-preview pre {
+  background: #1e1e2e;
+}
+
+.md-preview pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.md-preview blockquote {
+  margin: 16px 0;
+  padding: 8px 16px;
+  border-left: 4px solid #007aff;
+  background: #f5f5f7;
+  border-radius: 0 8px 8px 0;
+}
+
+.dark .md-preview blockquote {
+  background: #3a3b41;
+}
+
+.md-preview table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+}
+
+.md-preview th,
+.md-preview td {
+  padding: 10px 14px;
+  border: 1px solid #e5e5e5;
+  text-align: left;
+}
+
+.dark .md-preview th,
+.dark .md-preview td {
+  border-color: #3a3a3c;
+}
+
+.md-preview th {
+  background: #f5f5f7;
+  font-weight: 600;
+}
+
+.dark .md-preview th {
+  background: #3a3b41;
+}
+
+.md-preview a {
+  color: #007aff;
+  text-decoration: none;
+}
+
+.md-preview a:hover {
+  text-decoration: underline;
+}
+
+.md-preview img {
+  max-width: 100%;
+  border-radius: 8px;
+  margin: 8px 0;
+}
+
+.md-preview hr {
+  border: none;
+  height: 1px;
+  background: #e5e5e5;
+  margin: 24px 0;
+}
+
+.dark .md-preview hr {
+  background: #3a3a3c;
+}
+
+/* 文本预览 */
+.text-preview {
+  margin: 0;
+  padding: 16px;
+  background: #f5f5f7;
+  border-radius: 8px;
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #1a1a1a;
+  max-height: calc(90vh - 150px);
+  overflow: auto;
+}
+
+.dark .text-preview {
+  background: #1e1e2e;
+  color: #cdd6f4;
+}
+
+/* Excel 预览 */
+.excel-preview {
+  overflow: auto;
+}
+
+.excel-sheet {
+  margin-bottom: 16px;
+}
+
+.sheet-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  background: #f5f5f7;
+  border-radius: 6px;
+}
+
+.dark .sheet-title {
+  background: #3a3b41;
+  color: #ffffff;
+}
+
+.excel-preview .table-wrapper {
+  overflow: auto;
+  border-radius: 8px;
+  border: 1px solid #e5e5e5;
+}
+
+.dark .excel-preview .table-wrapper {
+  border-color: #3a3a3c;
+}
+
+.excel-preview table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.excel-preview th,
+.excel-preview td {
+  padding: 8px 12px;
+  border: 1px solid #e5e5e5;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.dark .excel-preview th,
+.dark .excel-preview td {
+  border-color: #3a3a3c;
+}
+
+.excel-preview th {
+  background: #f5f5f7;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.dark .excel-preview th {
+  background: #3a3b41;
+}
+
+.excel-preview tr:nth-child(even) td {
+  background: #fafafa;
+}
+
+.dark .excel-preview tr:nth-child(even) td {
+  background: #2e2f36;
+}
+
+/* Word 预览 */
+.word-preview {
+  font-size: 14px;
+  line-height: 1.8;
+  color: #1a1a1a;
+}
+
+.dark .word-preview {
+  color: #cdd6f4;
+}
+
+.word-preview h1,
+.word-preview h2,
+.word-preview h3,
+.word-preview h4,
+.word-preview h5,
+.word-preview h6 {
+  margin: 16px 0 8px;
+  font-weight: 600;
+}
+
+.word-preview p {
+  margin: 8px 0;
+}
+
+.word-preview ul,
+.word-preview ol {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+.word-preview table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+}
+
+.word-preview table th,
+.word-preview table td {
+  border: 1px solid #e5e5e5;
+  padding: 8px;
+}
+
+.dark .word-preview table th,
+.dark .word-preview table td {
+  border-color: #3a3a3c;
+}
+
+/* 加载状态 */
+.doc-preview-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  gap: 16px;
+  color: #6e6e80;
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e5e5e5;
+  border-top-color: #007aff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.dark .loading-spinner {
+  border-color: #3a3a3c;
+  border-top-color: #007aff;
+}
+
+/* 错误状态 */
+.doc-preview-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  gap: 12px;
+  color: #6e6e80;
+  text-align: center;
+}
+
+.doc-preview-error svg {
+  color: #ff6b6b;
+}
+
+.doc-preview-error p {
+  margin: 0;
+}
+
+/* 不支持预览 */
+.doc-preview-unsupported {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  gap: 12px;
+  color: #6e6e80;
+  text-align: center;
+}
+
+.doc-preview-unsupported svg {
+  opacity: 0.5;
+}
+
+.doc-preview-unsupported p {
+  margin: 0;
+}
+
+/* 下载按钮 */
+.btn-download {
+  padding: 10px 20px;
+  background: #007aff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-top: 8px;
+}
+
+.btn-download:hover {
+  background: #0056cc;
 }
 </style>
