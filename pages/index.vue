@@ -611,6 +611,8 @@
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.95-.376-1.862-1.057-2.528l-.548-.547z" />
                         </svg>
                         <span>思考过程</span>
+                        <!-- 流式生成中的动画提示 -->
+                        <span v-if="!parseThinkContent(msg.content).answer" class="thinking-status">生成中...</span>
                         <svg class="thinking-toggle-icon" :class="{ 'collapsed': !expandedThinking.has(msg.id) }" width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                         </svg>
@@ -1131,17 +1133,26 @@ const md = new MarkdownIt({
   },
 });
 
-// 分离思考和回答内容
+// 分离思考和回答内容（支持流式生成中的未闭合标签）
 const parseThinkContent = (content) => {
   if (!content) return { thinking: '', answer: '' };
 
-  // 匹配 <think>...</think> 标签
+  // 匹配完整的 <think>...</think> 标签
   const thinkMatch = content.match(/<think>([\s\S]*?)<\/think>/);
 
   if (thinkMatch) {
     const thinking = thinkMatch[1].trim();
     const answer = content.replace(/<think>[\s\S]*?<\/think>/, '').trim();
     return { thinking, answer };
+  }
+
+  // 匹配未闭合的 <think> 标签（流式生成中）
+  const unclosedThinkMatch = content.match(/<think>([\s\S]*)/);
+
+  if (unclosedThinkMatch) {
+    // 思考过程还在生成中
+    const thinking = unclosedThinkMatch[1].trim();
+    return { thinking, answer: '' };
   }
 
   return { thinking: '', answer: content };
@@ -1864,6 +1875,14 @@ const sendMessage = async () => {
               const msgIndex = messages.value.findIndex(m => m.id === currentStreamingMessageId.value);
               if (msgIndex !== -1) {
                 messages.value[msgIndex].content += data.content;
+
+                // 检测到思考过程标签，自动展开
+                const currentContent = messages.value[msgIndex].content;
+                if (currentContent.includes('athers') &&
+                    !expandedThinking.value.has(messages.value[msgIndex].id)) {
+                  expandedThinking.value.add(messages.value[msgIndex].id);
+                }
+
                 scrollToBottom();
               }
             } else if (data.type === 'error') {
