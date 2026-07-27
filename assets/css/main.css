@@ -1,4 +1,128 @@
 /* ============================================
+   DeepSeek 思考过程样式
+   ============================================ */
+.ai-message-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.thinking-section {
+  background: #f8f9fa;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 0;
+}
+
+.dark .thinking-section {
+  background: #2d2d3a;
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.thinking-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.02);
+  cursor: pointer;
+  transition: background 0.2s;
+  user-select: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: #667eea;
+}
+
+.dark .thinking-header {
+  background: rgba(255, 255, 255, 0.03);
+  color: #9099f5;
+}
+
+.thinking-header:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.dark .thinking-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.thinking-header svg {
+  flex-shrink: 0;
+}
+
+.thinking-toggle-icon {
+  margin-left: auto;
+  transition: transform 0.3s ease;
+}
+
+.thinking-toggle-icon.collapsed {
+  transform: rotate(-90deg);
+}
+
+.thinking-content {
+  padding: 0 16px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.thinking-content > div {
+  padding: 16px 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #6e6e80;
+}
+
+.dark .thinking-content > div {
+  color: #a0a0b0;
+}
+
+.thinking-content p {
+  margin-bottom: 0.5em;
+}
+
+.thinking-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* 思考过程滚动条样式 */
+.thinking-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.thinking-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.thinking-content::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.dark .thinking-content::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+/* 思考过程展开/折叠动画 */
+.thinking-content-enter-active,
+.thinking-content-leave-active {
+  transition: all 0.3s ease;
+  max-height: 400px;
+}
+
+.thinking-content-enter-from,
+.thinking-content-leave-to {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.answer-content {
+  margin-top: 0;
+}
+
+/* ============================================
    ChatGPT 风格样式表 - 完整版
    ============================================ */
 
@@ -53,6 +177,130 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #a1a1a1;
+}
+
+/* ============================================
+   DeepSeek 思考过程样式
+   ============================================ */
+.ai-message-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.thinking-section {
+  background: #f8f9fa;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 0;
+}
+
+.dark .thinking-section {
+  background: #2d2d3a;
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.thinking-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.02);
+  cursor: pointer;
+  transition: background 0.2s;
+  user-select: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: #667eea;
+}
+
+.dark .thinking-header {
+  background: rgba(255, 255, 255, 0.03);
+  color: #9099f5;
+}
+
+.thinking-header:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.dark .thinking-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.thinking-header svg {
+  flex-shrink: 0;
+}
+
+.thinking-toggle-icon {
+  margin-left: auto;
+  transition: transform 0.3s ease;
+}
+
+.thinking-toggle-icon.collapsed {
+  transform: rotate(-90deg);
+}
+
+.thinking-content {
+  padding: 0 16px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.thinking-content > div {
+  padding: 16px 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #6e6e80;
+}
+
+.dark .thinking-content > div {
+  color: #a0a0b0;
+}
+
+.thinking-content p {
+  margin-bottom: 0.5em;
+}
+
+.thinking-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* 思考过程滚动条样式 */
+.thinking-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.thinking-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.thinking-content::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.dark .thinking-content::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+/* 思考过程展开/折叠动画 */
+.thinking-content-enter-active,
+.thinking-content-leave-active {
+  transition: all 0.3s ease;
+  max-height: 400px;
+}
+
+.thinking-content-enter-from,
+.thinking-content-leave-to {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.answer-content {
+  margin-top: 0;
 }
 
 /* ============================================
@@ -520,6 +768,130 @@ body {
 }
 
 /* ============================================
+   DeepSeek 思考过程样式
+   ============================================ */
+.ai-message-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.thinking-section {
+  background: #f8f9fa;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 0;
+}
+
+.dark .thinking-section {
+  background: #2d2d3a;
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.thinking-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.02);
+  cursor: pointer;
+  transition: background 0.2s;
+  user-select: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: #667eea;
+}
+
+.dark .thinking-header {
+  background: rgba(255, 255, 255, 0.03);
+  color: #9099f5;
+}
+
+.thinking-header:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.dark .thinking-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.thinking-header svg {
+  flex-shrink: 0;
+}
+
+.thinking-toggle-icon {
+  margin-left: auto;
+  transition: transform 0.3s ease;
+}
+
+.thinking-toggle-icon.collapsed {
+  transform: rotate(-90deg);
+}
+
+.thinking-content {
+  padding: 0 16px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.thinking-content > div {
+  padding: 16px 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #6e6e80;
+}
+
+.dark .thinking-content > div {
+  color: #a0a0b0;
+}
+
+.thinking-content p {
+  margin-bottom: 0.5em;
+}
+
+.thinking-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* 思考过程滚动条样式 */
+.thinking-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.thinking-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.thinking-content::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.dark .thinking-content::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+/* 思考过程展开/折叠动画 */
+.thinking-content-enter-active,
+.thinking-content-leave-active {
+  transition: all 0.3s ease;
+  max-height: 400px;
+}
+
+.thinking-content-enter-from,
+.thinking-content-leave-to {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.answer-content {
+  margin-top: 0;
+}
+
+/* ============================================
    Main Content 主内容区
    ============================================ */
 .main-content {
@@ -539,6 +911,130 @@ body {
 
 .dark .main-content {
   background: #343541;
+}
+
+/* ============================================
+   DeepSeek 思考过程样式
+   ============================================ */
+.ai-message-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.thinking-section {
+  background: #f8f9fa;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 0;
+}
+
+.dark .thinking-section {
+  background: #2d2d3a;
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.thinking-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.02);
+  cursor: pointer;
+  transition: background 0.2s;
+  user-select: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: #667eea;
+}
+
+.dark .thinking-header {
+  background: rgba(255, 255, 255, 0.03);
+  color: #9099f5;
+}
+
+.thinking-header:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.dark .thinking-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.thinking-header svg {
+  flex-shrink: 0;
+}
+
+.thinking-toggle-icon {
+  margin-left: auto;
+  transition: transform 0.3s ease;
+}
+
+.thinking-toggle-icon.collapsed {
+  transform: rotate(-90deg);
+}
+
+.thinking-content {
+  padding: 0 16px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.thinking-content > div {
+  padding: 16px 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #6e6e80;
+}
+
+.dark .thinking-content > div {
+  color: #a0a0b0;
+}
+
+.thinking-content p {
+  margin-bottom: 0.5em;
+}
+
+.thinking-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* 思考过程滚动条样式 */
+.thinking-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.thinking-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.thinking-content::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.dark .thinking-content::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+/* 思考过程展开/折叠动画 */
+.thinking-content-enter-active,
+.thinking-content-leave-active {
+  transition: all 0.3s ease;
+  max-height: 400px;
+}
+
+.thinking-content-enter-from,
+.thinking-content-leave-to {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.answer-content {
+  margin-top: 0;
 }
 
 /* ============================================
@@ -636,6 +1132,130 @@ body {
 
 .dark .icon-button:hover {
   background: rgba(255, 255, 255, 0.1);
+}
+
+/* ============================================
+   DeepSeek 思考过程样式
+   ============================================ */
+.ai-message-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.thinking-section {
+  background: #f8f9fa;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 0;
+}
+
+.dark .thinking-section {
+  background: #2d2d3a;
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.thinking-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.02);
+  cursor: pointer;
+  transition: background 0.2s;
+  user-select: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: #667eea;
+}
+
+.dark .thinking-header {
+  background: rgba(255, 255, 255, 0.03);
+  color: #9099f5;
+}
+
+.thinking-header:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.dark .thinking-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.thinking-header svg {
+  flex-shrink: 0;
+}
+
+.thinking-toggle-icon {
+  margin-left: auto;
+  transition: transform 0.3s ease;
+}
+
+.thinking-toggle-icon.collapsed {
+  transform: rotate(-90deg);
+}
+
+.thinking-content {
+  padding: 0 16px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.thinking-content > div {
+  padding: 16px 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #6e6e80;
+}
+
+.dark .thinking-content > div {
+  color: #a0a0b0;
+}
+
+.thinking-content p {
+  margin-bottom: 0.5em;
+}
+
+.thinking-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* 思考过程滚动条样式 */
+.thinking-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.thinking-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.thinking-content::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.dark .thinking-content::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+/* 思考过程展开/折叠动画 */
+.thinking-content-enter-active,
+.thinking-content-leave-active {
+  transition: all 0.3s ease;
+  max-height: 400px;
+}
+
+.thinking-content-enter-from,
+.thinking-content-leave-to {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.answer-content {
+  margin-top: 0;
 }
 
 /* ============================================
@@ -867,6 +1487,130 @@ body {
 }
 
 /* ============================================
+   DeepSeek 思考过程样式
+   ============================================ */
+.ai-message-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.thinking-section {
+  background: #f8f9fa;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 0;
+}
+
+.dark .thinking-section {
+  background: #2d2d3a;
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.thinking-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.02);
+  cursor: pointer;
+  transition: background 0.2s;
+  user-select: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: #667eea;
+}
+
+.dark .thinking-header {
+  background: rgba(255, 255, 255, 0.03);
+  color: #9099f5;
+}
+
+.thinking-header:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.dark .thinking-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.thinking-header svg {
+  flex-shrink: 0;
+}
+
+.thinking-toggle-icon {
+  margin-left: auto;
+  transition: transform 0.3s ease;
+}
+
+.thinking-toggle-icon.collapsed {
+  transform: rotate(-90deg);
+}
+
+.thinking-content {
+  padding: 0 16px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.thinking-content > div {
+  padding: 16px 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #6e6e80;
+}
+
+.dark .thinking-content > div {
+  color: #a0a0b0;
+}
+
+.thinking-content p {
+  margin-bottom: 0.5em;
+}
+
+.thinking-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* 思考过程滚动条样式 */
+.thinking-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.thinking-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.thinking-content::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.dark .thinking-content::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+/* 思考过程展开/折叠动画 */
+.thinking-content-enter-active,
+.thinking-content-leave-active {
+  transition: all 0.3s ease;
+  max-height: 400px;
+}
+
+.thinking-content-enter-from,
+.thinking-content-leave-to {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.answer-content {
+  margin-top: 0;
+}
+
+/* ============================================
    Spinner Animation
    ============================================ */
 .spinner {
@@ -947,6 +1691,130 @@ body {
 }
 
 /* ============================================
+   DeepSeek 思考过程样式
+   ============================================ */
+.ai-message-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.thinking-section {
+  background: #f8f9fa;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 0;
+}
+
+.dark .thinking-section {
+  background: #2d2d3a;
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.thinking-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.02);
+  cursor: pointer;
+  transition: background 0.2s;
+  user-select: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: #667eea;
+}
+
+.dark .thinking-header {
+  background: rgba(255, 255, 255, 0.03);
+  color: #9099f5;
+}
+
+.thinking-header:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.dark .thinking-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.thinking-header svg {
+  flex-shrink: 0;
+}
+
+.thinking-toggle-icon {
+  margin-left: auto;
+  transition: transform 0.3s ease;
+}
+
+.thinking-toggle-icon.collapsed {
+  transform: rotate(-90deg);
+}
+
+.thinking-content {
+  padding: 0 16px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.thinking-content > div {
+  padding: 16px 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #6e6e80;
+}
+
+.dark .thinking-content > div {
+  color: #a0a0b0;
+}
+
+.thinking-content p {
+  margin-bottom: 0.5em;
+}
+
+.thinking-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* 思考过程滚动条样式 */
+.thinking-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.thinking-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.thinking-content::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.dark .thinking-content::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+/* 思考过程展开/折叠动画 */
+.thinking-content-enter-active,
+.thinking-content-leave-active {
+  transition: all 0.3s ease;
+  max-height: 400px;
+}
+
+.thinking-content-enter-from,
+.thinking-content-leave-to {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.answer-content {
+  margin-top: 0;
+}
+
+/* ============================================
    深度思考按钮
    ============================================ */
 .deep-think-btn {
@@ -990,6 +1858,130 @@ body {
 
 .dark .deep-think-hint {
   background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
+}
+
+/* ============================================
+   DeepSeek 思考过程样式
+   ============================================ */
+.ai-message-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.thinking-section {
+  background: #f8f9fa;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 0;
+}
+
+.dark .thinking-section {
+  background: #2d2d3a;
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.thinking-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.02);
+  cursor: pointer;
+  transition: background 0.2s;
+  user-select: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: #667eea;
+}
+
+.dark .thinking-header {
+  background: rgba(255, 255, 255, 0.03);
+  color: #9099f5;
+}
+
+.thinking-header:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.dark .thinking-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.thinking-header svg {
+  flex-shrink: 0;
+}
+
+.thinking-toggle-icon {
+  margin-left: auto;
+  transition: transform 0.3s ease;
+}
+
+.thinking-toggle-icon.collapsed {
+  transform: rotate(-90deg);
+}
+
+.thinking-content {
+  padding: 0 16px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.thinking-content > div {
+  padding: 16px 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #6e6e80;
+}
+
+.dark .thinking-content > div {
+  color: #a0a0b0;
+}
+
+.thinking-content p {
+  margin-bottom: 0.5em;
+}
+
+.thinking-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* 思考过程滚动条样式 */
+.thinking-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.thinking-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.thinking-content::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.dark .thinking-content::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+/* 思考过程展开/折叠动画 */
+.thinking-content-enter-active,
+.thinking-content-leave-active {
+  transition: all 0.3s ease;
+  max-height: 400px;
+}
+
+.thinking-content-enter-from,
+.thinking-content-leave-to {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.answer-content {
+  margin-top: 0;
 }
 
 /* ============================================
@@ -1062,6 +2054,130 @@ body {
 
 .dark .suggestion-card:hover {
   background: #545563;
+}
+
+/* ============================================
+   DeepSeek 思考过程样式
+   ============================================ */
+.ai-message-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.thinking-section {
+  background: #f8f9fa;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 0;
+}
+
+.dark .thinking-section {
+  background: #2d2d3a;
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.thinking-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.02);
+  cursor: pointer;
+  transition: background 0.2s;
+  user-select: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: #667eea;
+}
+
+.dark .thinking-header {
+  background: rgba(255, 255, 255, 0.03);
+  color: #9099f5;
+}
+
+.thinking-header:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.dark .thinking-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.thinking-header svg {
+  flex-shrink: 0;
+}
+
+.thinking-toggle-icon {
+  margin-left: auto;
+  transition: transform 0.3s ease;
+}
+
+.thinking-toggle-icon.collapsed {
+  transform: rotate(-90deg);
+}
+
+.thinking-content {
+  padding: 0 16px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.thinking-content > div {
+  padding: 16px 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #6e6e80;
+}
+
+.dark .thinking-content > div {
+  color: #a0a0b0;
+}
+
+.thinking-content p {
+  margin-bottom: 0.5em;
+}
+
+.thinking-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* 思考过程滚动条样式 */
+.thinking-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.thinking-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.thinking-content::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.dark .thinking-content::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+/* 思考过程展开/折叠动画 */
+.thinking-content-enter-active,
+.thinking-content-leave-active {
+  transition: all 0.3s ease;
+  max-height: 400px;
+}
+
+.thinking-content-enter-from,
+.thinking-content-leave-to {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.answer-content {
+  margin-top: 0;
 }
 
 /* ============================================
@@ -1219,6 +2335,130 @@ body {
 .dark .login-error {
   background: #2a1b1b;
   border-color: #5c2b2b;
+}
+
+/* ============================================
+   DeepSeek 思考过程样式
+   ============================================ */
+.ai-message-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.thinking-section {
+  background: #f8f9fa;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 0;
+}
+
+.dark .thinking-section {
+  background: #2d2d3a;
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.thinking-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.02);
+  cursor: pointer;
+  transition: background 0.2s;
+  user-select: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: #667eea;
+}
+
+.dark .thinking-header {
+  background: rgba(255, 255, 255, 0.03);
+  color: #9099f5;
+}
+
+.thinking-header:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.dark .thinking-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.thinking-header svg {
+  flex-shrink: 0;
+}
+
+.thinking-toggle-icon {
+  margin-left: auto;
+  transition: transform 0.3s ease;
+}
+
+.thinking-toggle-icon.collapsed {
+  transform: rotate(-90deg);
+}
+
+.thinking-content {
+  padding: 0 16px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.thinking-content > div {
+  padding: 16px 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #6e6e80;
+}
+
+.dark .thinking-content > div {
+  color: #a0a0b0;
+}
+
+.thinking-content p {
+  margin-bottom: 0.5em;
+}
+
+.thinking-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* 思考过程滚动条样式 */
+.thinking-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.thinking-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.thinking-content::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.dark .thinking-content::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+/* 思考过程展开/折叠动画 */
+.thinking-content-enter-active,
+.thinking-content-leave-active {
+  transition: all 0.3s ease;
+  max-height: 400px;
+}
+
+.thinking-content-enter-from,
+.thinking-content-leave-to {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.answer-content {
+  margin-top: 0;
 }
 
 /* ============================================

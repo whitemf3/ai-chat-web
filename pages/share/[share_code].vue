@@ -31,7 +31,39 @@
           <div :class="['message-avatar', msg.role]">
             {{ msg.role === 'user' ? '你' : 'AI' }}
           </div>
-          <div class="message-content" v-html="renderMarkdown(msg.content)"></div>
+          <div class="message-wrapper">
+            <!-- AI 消息：支持思考过程显示 -->
+            <div v-if="msg.role === 'assistant'" class="ai-message-container">
+              <!-- 思考过程（DeepSeek 模型） -->
+              <div
+                v-if="parseThinkContent(msg.content).thinking"
+                class="thinking-section"
+              >
+                <div class="thinking-header" @click="toggleThinking(msg.created_at)">
+                  <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.95-.376-1.862-1.057-2.528l-.548-.547z" />
+                  </svg>
+                  <span>思考过程</span>
+                  <svg class="thinking-toggle-icon" :class="{ 'collapsed': !expandedThinking.has(msg.created_at) }" width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+                <Transition name="thinking-content">
+                  <div v-show="expandedThinking.has(msg.created_at)" class="thinking-content">
+                    <div v-html="renderMarkdown(parseThinkContent(msg.content).thinking)"></div>
+                  </div>
+                </Transition>
+              </div>
+              <!-- 正常回答内容 -->
+              <div v-if="parseThinkContent(msg.content).answer" class="answer-content">
+                <div class="message-content" v-html="renderMarkdown(parseThinkContent(msg.content).answer)"></div>
+              </div>
+              <!-- 没有思考过程的普通消息 -->
+              <div v-else-if="!parseThinkContent(msg.content).thinking" class="message-content" v-html="renderMarkdown(msg.content)"></div>
+            </div>
+            <!-- 用户消息 -->
+            <div v-else class="message-content" v-html="renderMarkdown(msg.content)"></div>
+          </div>
         </div>
       </div>
 
@@ -65,6 +97,18 @@ const messages = ref([]);
 const expiresAt = ref('');
 const viewCount = ref(0);
 
+// 思考过程展开状态
+const expandedThinking = ref(new Set());
+
+// 切换思考过程展开/折叠
+const toggleThinking = (messageId) => {
+  if (expandedThinking.value.has(messageId)) {
+    expandedThinking.value.delete(messageId);
+  } else {
+    expandedThinking.value.add(messageId);
+  }
+};
+
 // Markdown 渲染器
 const md = new MarkdownIt({
   highlight: (str, lang) => {
@@ -75,6 +119,23 @@ const md = new MarkdownIt({
   },
 });
 
+// 分离思考和回答内容
+const parseThinkContent = (content) => {
+  if (!content) return { thinking: '', answer: '' };
+
+  // 匹配 <think>...</think> 标签
+  const thinkMatch = content.match(/<think>([\s\S]*?)<\/think>/);
+
+  if (thinkMatch) {
+    const thinking = thinkMatch[1].trim();
+    const answer = content.replace(/<think>[\s\S]*?<\/think>/, '').trim();
+    return { thinking, answer };
+  }
+
+  return { thinking: '', answer: content };
+};
+
+// 渲染 Markdown
 const renderMarkdown = (content) => md.render(content);
 
 // 使用统一的日期格式化函数
@@ -222,8 +283,13 @@ onMounted(async () => {
   color: white;
 }
 
-.message-content {
+.message-wrapper {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.message-content {
   line-height: 1.75;
   font-size: 15px;
 }
@@ -240,6 +306,87 @@ onMounted(async () => {
   font-family: 'Menlo', 'Monaco', monospace;
   font-size: 14px;
   color: #24292e;
+}
+
+/* DeepSeek 思考过程样式 */
+.ai-message-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.thinking-section {
+  background: #f8f9fa;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.thinking-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.02);
+  cursor: pointer;
+  transition: background 0.2s;
+  user-select: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: #667eea;
+}
+
+.thinking-header:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.thinking-toggle-icon {
+  margin-left: auto;
+  transition: transform 0.3s ease;
+}
+
+.thinking-toggle-icon.collapsed {
+  transform: rotate(-90deg);
+}
+
+.thinking-content {
+  padding: 0 16px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.thinking-content > div {
+  padding: 16px 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #6e6e80;
+}
+
+.thinking-content p {
+  margin-bottom: 0.5em;
+}
+
+.thinking-content p:last-child {
+  margin-bottom: 0;
+}
+
+.answer-content {
+  margin-top: 0;
+}
+
+/* 思考过程展开/折叠动画 */
+.thinking-content-enter-active,
+.thinking-content-leave-active {
+  transition: all 0.3s ease;
+  max-height: 400px;
+}
+
+.thinking-content-enter-from,
+.thinking-content-leave-to {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .share-footer {
