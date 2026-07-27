@@ -193,7 +193,7 @@ runtimeConfig: {
 
 1. 连接 GitHub 仓库到 Cloudflare Pages
 2. 配置构建命令：
-   - Build command: `npm run generate`
+   - Build command: `npm run build`
    - Build output directory: `dist`
 3. 设置环境变量 `NUXT_PUBLIC_API_BASE`
 
@@ -284,8 +284,8 @@ A: 检查系统主题设置，或手动切换主题。
 
 ## 相关项目
 
-- [worker](../worker/) - Cloudflare Workers API 后端
-- [admin](../admin/) - 后台管理系统
+- [worker](../../../ai-chat-worker/) - Cloudflare Workers API 后端
+- [admin](../../../ai-chat-wms/) - 后台管理系统
 
 ## License
 
