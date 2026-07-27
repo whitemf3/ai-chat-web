@@ -274,13 +274,15 @@
         <div v-if="showUserMenu" class="user-menu" @click.stop>
           <!-- 额度显示 -->
           <div class="menu-quota">
-            <div class="quota-label">今日额度</div>
+            <div class="quota-header">
+              <span class="quota-label">今日额度</span>
+              <span v-if="quotaLimit > 0" class="quota-percent">{{ quotaPercent.toFixed(1) }}%</span>
+            </div>
             <div class="quota-bar">
               <div class="quota-used" :style="{ width: quotaPercent + '%' }"></div>
             </div>
             <div class="quota-info">
               <span>{{ quotaUsed.toLocaleString() }} / {{ quotaLimit > 0 ? quotaLimit.toLocaleString() : '无限制' }}</span>
-              <span v-if="quotaLimit > 0">{{ quotaPercent.toFixed(1) }}%</span>
             </div>
           </div>
           <div class="menu-divider"></div>
@@ -613,12 +615,12 @@
                         <span>思考过程</span>
                         <!-- 流式生成中的动画提示 -->
                         <span v-if="!parseThinkContent(msg.content).answer" class="thinking-status">生成中...</span>
-                        <svg class="thinking-toggle-icon" :class="{ 'collapsed': !expandedThinking.has(msg.id) }" width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="thinking-toggle-icon" :class="{ 'collapsed': collapsedThinking.has(msg.id) }" width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                         </svg>
                       </div>
                       <Transition name="thinking-content">
-                        <div v-show="expandedThinking.has(msg.id)" class="thinking-content">
+                        <div v-show="!collapsedThinking.has(msg.id)" class="thinking-content">
                           <div v-html="renderMarkdown(parseThinkContent(msg.content).thinking)"></div>
                         </div>
                       </Transition>
@@ -1088,15 +1090,15 @@ const workflows = ref([]);
 const selectedWorkflow = ref(null);
 const showWorkflowMenu = ref(false);
 
-// 思考过程展开状态
-const expandedThinking = ref(new Set());
+// 思考过程折叠状态（默认展开，所以是折叠集合）
+const collapsedThinking = ref(new Set());
 
 // 切换思考过程展开/折叠
 const toggleThinking = (messageId) => {
-  if (expandedThinking.value.has(messageId)) {
-    expandedThinking.value.delete(messageId);
+  if (collapsedThinking.value.has(messageId)) {
+    collapsedThinking.value.delete(messageId);
   } else {
-    expandedThinking.value.add(messageId);
+    collapsedThinking.value.add(messageId);
   }
 };
 
@@ -1875,14 +1877,6 @@ const sendMessage = async () => {
               const msgIndex = messages.value.findIndex(m => m.id === currentStreamingMessageId.value);
               if (msgIndex !== -1) {
                 messages.value[msgIndex].content += data.content;
-
-                // 检测到思考过程标签，自动展开
-                const currentContent = messages.value[msgIndex].content;
-                if (currentContent.includes('athers') &&
-                    !expandedThinking.value.has(messages.value[msgIndex].id)) {
-                  expandedThinking.value.add(messages.value[msgIndex].id);
-                }
-
                 scrollToBottom();
               }
             } else if (data.type === 'error') {
@@ -2944,13 +2938,29 @@ const closeDocPreview = () => {
   padding: 12px 14px;
 }
 
+.user-menu .quota-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
 .user-menu .quota-label {
   font-size: 11px;
   color: #8e8e93;
-  margin-bottom: 6px;
 }
 
 .dark .user-menu .quota-label {
+  color: #98989d;
+}
+
+.user-menu .quota-percent {
+  font-size: 11px;
+  color: #8e8e93;
+  font-weight: 500;
+}
+
+.dark .user-menu .quota-percent {
   color: #98989d;
 }
 
@@ -2959,7 +2969,7 @@ const closeDocPreview = () => {
   background: #e5e5e5;
   border-radius: 3px;
   overflow: hidden;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 .dark .user-menu .quota-bar {
@@ -2978,8 +2988,6 @@ const closeDocPreview = () => {
 }
 
 .user-menu .quota-info {
-  display: flex;
-  justify-content: space-between;
   font-size: 11px;
   color: #8e8e93;
 }

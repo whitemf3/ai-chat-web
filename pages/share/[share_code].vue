@@ -44,12 +44,12 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.95-.376-1.862-1.057-2.528l-.548-.547z" />
                   </svg>
                   <span>思考过程</span>
-                  <svg class="thinking-toggle-icon" :class="{ 'collapsed': !expandedThinking.has(msg.created_at) }" width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="thinking-toggle-icon" :class="{ 'collapsed': collapsedThinking.has(msg.created_at) }" width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                   </svg>
                 </div>
                 <Transition name="thinking-content">
-                  <div v-show="expandedThinking.has(msg.created_at)" class="thinking-content">
+                  <div v-show="!collapsedThinking.has(msg.created_at)" class="thinking-content">
                     <div v-html="renderMarkdown(parseThinkContent(msg.content).thinking)"></div>
                   </div>
                 </Transition>
@@ -97,15 +97,15 @@ const messages = ref([]);
 const expiresAt = ref('');
 const viewCount = ref(0);
 
-// 思考过程展开状态
-const expandedThinking = ref(new Set());
+// 思考过程折叠状态（默认展开，所以是折叠集合）
+const collapsedThinking = ref(new Set());
 
 // 切换思考过程展开/折叠
 const toggleThinking = (messageId) => {
-  if (expandedThinking.value.has(messageId)) {
-    expandedThinking.value.delete(messageId);
+  if (collapsedThinking.value.has(messageId)) {
+    collapsedThinking.value.delete(messageId);
   } else {
-    expandedThinking.value.add(messageId);
+    collapsedThinking.value.add(messageId);
   }
 };
 
