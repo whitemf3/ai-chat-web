@@ -62,6 +62,11 @@
           :required="!isLogin"
         />
 
+        <!-- Turnstile widget for login and registration -->
+        <div class="turnstile-wrapper">
+          <div class="cf-turnstile" data-sitekey="0x4AAAAAAD_yxEkCTD6muHx5" data-action="turnstile-spin-v2"></div>
+        </div>
+
         <div v-if="error" class="login-error">{{ error }}</div>
 
         <button
@@ -99,6 +104,17 @@
 // 使用 blank 布局（不显示 header）
 definePageMeta({
   layout: 'blank'
+});
+
+// Load Turnstile script for registration
+useHead({
+  script: [
+    {
+      src: 'https://challenges.cloudflare.com/turnstile/v0/api.js',
+      async: true,
+      defer: true,
+    },
+  ],
 });
 
 // ============================================
@@ -168,11 +184,20 @@ const handleSubmit = async () => {
       return;
     }
 
+    // 获取 Turnstile token (登录和注册都需要)
+    const turnstileResponse = document.querySelector('input[name="cf-turnstile-response"]');
+    const turnstileToken = turnstileResponse?.value;
+    if (!turnstileToken) {
+      error.value = '请完成人机验证';
+      isLoading.value = false;
+      return;
+    }
+
     // 发送请求
     const endpoint = isLogin.value ? '/api/auth/login' : '/api/auth/register';
     const body = isLogin.value
-      ? { email: form.email, password: form.password }
-      : { email: form.email, username: form.username, password: form.password };
+      ? { email: form.email, password: form.password, turnstileToken }
+      : { email: form.email, username: form.username, password: form.password, turnstileToken };
 
     const res = await fetch(`${config.public.apiBase}${endpoint}`, {
       method: 'POST',
@@ -184,6 +209,10 @@ const handleSubmit = async () => {
 
     if (!data.success) {
       error.value = data.error.message;
+      // Reset Turnstile widget on failure so user can retry
+      if (window.turnstile) {
+        window.turnstile.reset();
+      }
       return;
     }
 
@@ -197,8 +226,24 @@ const handleSubmit = async () => {
   } catch (err) {
     console.error('Auth error:', err);
     error.value = '网络错误，请稍后重试';
+    // Reset Turnstile widget on network error
+    if (window.turnstile) {
+      window.turnstile.reset();
+    }
   } finally {
     isLoading.value = false;
   }
 };
 </script>
+
+<style scoped>
+.turnstile-wrapper {
+  display: flex;
+  justify-content: center;
+  margin: 16px 0;
+}
+
+.dark .turnstile-wrapper iframe {
+  color-scheme: dark;
+}
+</style>
