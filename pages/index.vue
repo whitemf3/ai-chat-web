@@ -589,8 +589,8 @@
                       </button>
                     </div>
                   </div>
-                  <!-- AI 消息内容为空时显示思考动画或错误 -->
-                  <div v-if="msg.role === 'assistant' && !msg.content" class="thinking-indicator">
+                  <!-- AI 消息内容为空时显示思考动画或错误（有生成图片时不显示错误） -->
+                  <div v-if="msg.role === 'assistant' && !msg.content && !hasGeneratedImages(msg)" class="thinking-indicator">
                     <!-- 如果当前正在流式传输中，显示思考动画 -->
                     <template v-if="isStreaming && currentStreamingMessageId === msg.id">
                       <span class="thinking-dot"></span>
@@ -603,6 +603,30 @@
                   <div v-else-if="msg.role === 'assistant' && msg.error" class="error-text">{{ msg.error }}</div>
                   <!-- AI 消息：支持思考过程显示 -->
                   <div v-else-if="msg.role === 'assistant'" class="ai-message-container">
+                    <!-- 文生图：展示生成的图片（R2 地址） -->
+                    <div v-if="hasGeneratedImages(msg)" class="message-generated-images">
+                      <div class="generated-image-item" v-for="(img, imgIdx) in getGeneratedImages(msg)" :key="'gen-' + imgIdx">
+                        <img
+                          :src="getFileUrl(img.url)"
+                          class="generated-image"
+                          :alt="msg.content || '生成的图片'"
+                          @click="previewImage(getFileUrl(img.url))"
+                        />
+                        <div class="generated-image-actions">
+                          <a
+                            :href="getFileUrl(img.url)"
+                            :download="getGeneratedImageName(img)"
+                            class="generated-image-download"
+                            title="下载图片"
+                          >
+                            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            <span>下载</span>
+                          </a>
+                        </div>
+                      </div>
+                    </div>
                     <!-- 思考过程（DeepSeek 模型） -->
                     <div
                       v-if="parseThinkContent(msg.content).thinking"
@@ -1513,6 +1537,26 @@ const getFileExtension = (filename) => {
   return ext || '';
 };
 
+// ============================================
+// 文生图：生成图片的展示辅助
+// ============================================
+// 获取消息中的生成图片附件列表
+const getGeneratedImages = (msg) => {
+  if (!msg?.metadata?.attachments || !Array.isArray(msg.metadata.attachments)) return [];
+  return msg.metadata.attachments.filter(a => a.type === 'generated_image' && a.url);
+};
+
+// 判断消息是否包含生成图片
+const hasGeneratedImages = (msg) => {
+  return getGeneratedImages(msg).length > 0;
+};
+
+// 生成下载文件名（提示词前20字符 + 模型名）
+const getGeneratedImageName = (img) => {
+  const modelShort = (img?.model || 'ai').split('/').pop() || 'ai';
+  return `ai-image-${modelShort}.png`;
+};
+
 // 下载文件
 const downloadFile = async (file) => {
   try {
@@ -1877,6 +1921,23 @@ const sendMessage = async () => {
               const msgIndex = messages.value.findIndex(m => m.id === currentStreamingMessageId.value);
               if (msgIndex !== -1) {
                 messages.value[msgIndex].content += data.content;
+                scrollToBottom();
+              }
+            } else if (data.type === 'image') {
+              // 文生图：接收生成的图片（R2 地址）
+              const msgIndex = messages.value.findIndex(m => m.id === currentStreamingMessageId.value);
+              if (msgIndex !== -1) {
+                if (!messages.value[msgIndex].metadata) {
+                  messages.value[msgIndex].metadata = {};
+                }
+                if (!messages.value[msgIndex].metadata.attachments) {
+                  messages.value[msgIndex].metadata.attachments = [];
+                }
+                messages.value[msgIndex].metadata.attachments.push({
+                  type: 'generated_image',
+                  url: data.url,
+                  model: data.model,
+                });
                 scrollToBottom();
               }
             } else if (data.type === 'error') {
@@ -2306,6 +2367,25 @@ const generateAIResponse = async () => {
                 const aiMsgIndex = messages.value.findIndex(m => m.id === currentStreamingMessageId.value);
                 if (aiMsgIndex !== -1) {
                   messages.value[aiMsgIndex].content += data.content;
+                  scrollToBottom();
+                }
+              }
+            } else if (data.type === 'image') {
+              // 文生图：接收生成的图片（R2 地址）
+              if (currentStreamingMessageId.value) {
+                const aiMsgIndex = messages.value.findIndex(m => m.id === currentStreamingMessageId.value);
+                if (aiMsgIndex !== -1) {
+                  if (!messages.value[aiMsgIndex].metadata) {
+                    messages.value[aiMsgIndex].metadata = {};
+                  }
+                  if (!messages.value[aiMsgIndex].metadata.attachments) {
+                    messages.value[aiMsgIndex].metadata.attachments = [];
+                  }
+                  messages.value[aiMsgIndex].metadata.attachments.push({
+                    type: 'generated_image',
+                    url: data.url,
+                    model: data.model,
+                  });
                   scrollToBottom();
                 }
               }
@@ -4096,6 +4176,76 @@ const closeDocPreview = () => {
 
 .message-image:hover {
   transform: scale(1.02);
+}
+
+/* Message Generated Images - 文生图生成图片样式 */
+.message-generated-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.generated-image-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #f5f5f7;
+}
+
+.dark .generated-image-item {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #3a3b41;
+}
+
+.generated-image {
+  display: block;
+  max-width: 320px;
+  max-height: 320px;
+  width: auto;
+  height: auto;
+  cursor: pointer;
+  transition: transform 0.2s;
+  object-fit: contain;
+}
+
+.generated-image:hover {
+  transform: scale(1.02);
+}
+
+.generated-image-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 6px 8px;
+}
+
+.generated-image-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #666;
+  text-decoration: none;
+  padding: 2px 8px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.generated-image-download:hover {
+  color: var(--primary-color, #007aff);
+  background: rgba(0, 122, 255, 0.08);
+}
+
+.dark .generated-image-download {
+  color: #aaa;
+}
+
+.dark .generated-image-download:hover {
+  color: #5ac8fa;
+  background: rgba(90, 200, 250, 0.1);
 }
 
 /* Message Document - 文档附件样式 */

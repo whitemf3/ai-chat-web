@@ -34,6 +34,17 @@
           <div class="message-wrapper">
             <!-- AI 消息：支持思考过程显示 -->
             <div v-if="msg.role === 'assistant'" class="ai-message-container">
+              <!-- 文生图：展示生成的图片 -->
+              <div v-if="getGeneratedImages(msg).length > 0" class="generated-images">
+                <img
+                  v-for="(img, imgIdx) in getGeneratedImages(msg)"
+                  :key="'gen-' + imgIdx"
+                  :src="getFileUrl(img.url)"
+                  class="generated-image"
+                  :alt="msg.content || '生成的图片'"
+                  @click="previewImage = getFileUrl(img.url)"
+                />
+              </div>
               <!-- 思考过程（DeepSeek 模型） -->
               <div
                 v-if="parseThinkContent(msg.content).thinking"
@@ -73,6 +84,12 @@
           开始使用 AI Chat
         </button>
       </footer>
+    </div>
+
+    <!-- 图片预览弹窗 -->
+    <div v-if="previewImage" class="image-preview-overlay" @click="closePreview">
+      <img :src="previewImage" class="image-preview-content" @click.stop />
+      <button class="image-preview-close" @click="closePreview" title="关闭">×</button>
     </div>
   </div>
 </template>
@@ -138,6 +155,35 @@ const parseThinkContent = (content) => {
 // 渲染 Markdown
 const renderMarkdown = (content) => md.render(content);
 
+// ============================================
+// 文生图：生成图片展示辅助
+// ============================================
+// 获取 API 基础地址
+const config = useRuntimeConfig();
+
+// 拼接完整的文件 URL
+const getFileUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  return `${config.public.apiBase}${url}`;
+};
+
+// 获取消息中的生成图片附件
+const getGeneratedImages = (msg) => {
+  if (!msg?.metadata?.attachments || !Array.isArray(msg.metadata.attachments)) return [];
+  return msg.metadata.attachments.filter(a => a.type === 'generated_image' && a.url);
+};
+
+// 图片预览
+const previewImage = ref('');
+
+// 关闭预览
+const closePreview = () => {
+  previewImage.value = '';
+};
+
 // 使用统一的日期格式化函数
 const formatTime = formatShort;
 
@@ -149,7 +195,6 @@ const goHome = () => {
 // 加载分享内容
 onMounted(async () => {
   try {
-    const config = useRuntimeConfig();
     const res = await fetch(`${config.public.apiBase}/api/share/${shareCode}`);
     const data = await res.json();
 
@@ -412,5 +457,66 @@ onMounted(async () => {
 
 .footer-btn.primary:hover {
   background: #0d8a6a;
+}
+
+/* 文生图生成图片样式 */
+.generated-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.generated-image {
+  max-width: 320px;
+  max-height: 320px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  object-fit: contain;
+  transition: transform 0.2s;
+}
+
+.generated-image:hover {
+  transform: scale(1.02);
+}
+
+/* 图片预览弹窗 */
+.image-preview-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  cursor: zoom-out;
+}
+
+.image-preview-content {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 8px;
+  cursor: default;
+}
+
+.image-preview-close {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.image-preview-close:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 </style>
