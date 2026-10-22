@@ -2280,9 +2280,36 @@ const generateAIResponse = async () => {
     const decoder = new TextDecoder();
     let buffer = '';
 
-    // 新 assistant 消息（本地构建，结束后由 refreshCurrentMessages 对齐服务端 ID）
-    const localId = 'regen-' + Date.now();
+    // 服务端 start chunk 携带真实消息 ID（D1 主键），直接使用以保证
+    // 后续编辑/删除操作两端 ID 一致；缺省时回退本地临时 ID
+    let serverMessageId = 'regen-' + Date.now();
+    let serverMetadata = null;
     let newText = '';
+    let gotStart = false;
+
+    // 流式增量渲染：收到首个 text-delta 即创建消息，后续逐步替换
+    const upsertStreamingMessage = () => {
+      if (!gotStart) {
+        gotStart = true;
+        chatSetMessages([
+          ...chatMessages.value,
+          {
+            id: serverMessageId,
+            role: 'assistant',
+            parts: [{ type: 'text', text: newText }],
+            metadata: serverMetadata || {},
+          },
+        ]);
+      } else {
+        const idx = chatMessages.value.findIndex(m => m.id === serverMessageId);
+        if (idx !== -1) {
+          chatSetMessages(chatMessages.value.map((m, i) => i === idx
+            ? { ...m, parts: [{ type: 'text', text: newText }] }
+            : m));
+        }
+      }
+      scrollToBottom();
+    };
 
     while (true) {
       const { done, value } = await reader.read();
@@ -2296,9 +2323,15 @@ const generateAIResponse = async () => {
         if (!line.startsWith('data: ')) continue;
         try {
           const chunk = JSON.parse(line.slice(6));
-          if (chunk.type === 'text-delta' && chunk.delta) {
+          if (chunk.type === 'start' && chunk.messageId) {
+            // 服务端真实消息 ID（在首个文本块之前到达）
+            serverMessageId = chunk.messageId;
+            if (chunk.messageMetadata) {
+              serverMetadata = chunk.messageMetadata;
+            }
+          } else if (chunk.type === 'text-delta' && chunk.delta) {
             newText += chunk.delta;
-            scrollToBottom();
+            upsertStreamingMessage();
           } else if (chunk.type === 'error') {
             throw new Error(formatAIError(chunk.errorText || chunk.message));
           }
@@ -2311,20 +2344,7 @@ const generateAIResponse = async () => {
       }
     }
 
-    if (newText) {
-      // 浅层响应式：以整体赋值方式追加消息
-      chatSetMessages([
-        ...chatMessages.value,
-        {
-          id: localId,
-          role: 'assistant',
-          parts: [{ type: 'text', text: newText }],
-          metadata: {},
-        },
-      ]);
-    }
-
-    // 与服务端对齐（获取真实消息 ID 与 metadata）
+    // 与服务端对齐（同步 metadata/tokens 等最终字段）
     await refreshCurrentMessages();
 
   } catch (err) {
