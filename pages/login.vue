@@ -184,13 +184,17 @@ const handleSubmit = async () => {
       return;
     }
 
-    // 获取 Turnstile token (登录和注册都需要)
-    const turnstileResponse = document.querySelector('input[name="cf-turnstile-response"]');
-    const turnstileToken = turnstileResponse?.value;
-    if (!turnstileToken) {
-      error.value = '请完成人机验证';
-      isLoading.value = false;
-      return;
+    // 获取 Turnstile token (登录和注册都需要；dev 环境豁免，与后端一致)
+    const isDev = config.public.apiBase.includes('localhost') || config.public.apiBase.includes('127.0.0.1');
+    let turnstileToken;
+    if (!isDev) {
+      const turnstileResponse = document.querySelector('input[name="cf-turnstile-response"]');
+      turnstileToken = turnstileResponse?.value;
+      if (!turnstileToken) {
+        error.value = '请完成人机验证';
+        isLoading.value = false;
+        return;
+      }
     }
 
     // 发送请求

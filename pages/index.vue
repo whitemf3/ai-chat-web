@@ -1045,6 +1045,9 @@
 <script setup>
 import MarkdownIt from 'markdown-it';
 import hljs from 'highlight.js';
+import { useChat } from '@ai-sdk/vue';
+import { DefaultChatTransport } from 'ai';
+import { dbMessageToUIMessage, uiMessageText, getGeneratedImages as getGeneratedImagesFromUIMessage } from '~/utils/uimessage';
 
 // 使用 blank 布局（不显示 header）
 definePageMeta({
@@ -1089,18 +1092,90 @@ const copyAlertKey = ref(0);
 // Chat State
 const conversations = ref([]);
 const currentConversationId = ref(null);
-const messages = ref([]);
 const inputMessage = ref('');
-const isStreaming = ref(false);
+
+// ============================================
+// AI SDK useChat：消息状态 / 发送 / 停止 / 重新生成全托管
+// 协议：UIMessageStream（SSE），与后端 chat.ts 对接
+// ============================================
+// 发送附加载荷（deep_think / workflow_id / 附件）：发送前更新此 ref，
+// prepareSendMessagesRequest 读取后注入请求 body
+const chatExtras = ref({ deep_think: false, workflow_id: null, attachments: [] });
+
+const chatTransport = new DefaultChatTransport({
+  prepareSendMessagesRequest: ({ id, messages, trigger, messageId, body }) => ({
+    // ai@7：自定义请求地址字段名为 api（url 无效）
+    api: `${config.public.apiBase}/api/chat/conversations/${currentConversationId.value || 'pending'}/messages`,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token.value && { Authorization: `Bearer ${token.value}` }),
+    },
+    body: {
+      id,
+      messages,
+      trigger,
+      ...(messageId ? { message_id: messageId } : {}),
+      ...(body || {}),
+      // 平台扩展载荷
+      deep_think: chatExtras.value.deep_think,
+      workflow_id: chatExtras.value.workflow_id,
+      attachments: chatExtras.value.attachments,
+    },
+  }),
+});
+
+const {
+  messages: chatMessages,
+  sendMessage: chatSendMessage,
+  stop: chatStop,
+  regenerate: chatRegenerate,
+  status: chatStatus,
+  error: chatError,
+} = useChat({
+  transport: chatTransport,
+  onError: (error) => {
+    console.error('useChat error:', error);
+  },
+});
+
+// 消息列表更新（@ai-sdk/vue 无 setMessages，直接赋值 messages ref）
+const chatSetMessages = (msgs) => {
+  chatMessages.value = msgs;
+};
+
+// 错误可见性：watch chatError 驱动弹窗（避免发送失败静默）
+watch(chatError, (err) => {
+  if (err) {
+    dialog.showError(formatAIError(err.message) || 'AI 生成失败，请稍后重试');
+  }
+});
+
+// 消息列表（渲染层统一入口）：UIMessage[] → 含 metadata 的消息对象
+// content 为 parts 文本拼接（兼容模板层的 msg.content 用法）
+const messages = computed(() =>
+  chatMessages.value.map((m) => ({
+    ...m,
+    content: uiMessageText(m),
+    metadata: m.metadata || {},
+    attachments: getGeneratedImagesFromUIMessage(m),
+  }))
+);
+
+// 流式状态（兼容模板与既有逻辑）
+const isStreaming = computed(() => chatStatus.value === 'submitted' || chatStatus.value === 'streaming');
 const messagesContainer = ref(null);
 const inputArea = ref(null);
-const abortController = ref(null);
 const editingMessageIndex = ref(null);
 const editingContent = ref('');
 const isSavingEdit = ref(false);
 const isRegenerating = ref(false);
 const stoppedMessages = ref(new Set());
-const currentStreamingMessageId = ref(null);
+const currentStreamingMessageId = computed(() => {
+  if (isStreaming.value && chatMessages.value.length > 0) {
+    return chatMessages.value[chatMessages.value.length - 1].id;
+  }
+  return null;
+});
 const isContinuing = ref(false);
 
 // Deep Think & File Upload
@@ -1376,7 +1451,7 @@ const createNewChat = async () => {
         // 找到空对话，选中它
         currentConversationId.value = emptyConv.id;
         window.location.hash = emptyConv.id;
-        messages.value = [];
+        chatSetMessages([]);
         return;
       }
     } catch (err) {
@@ -1394,7 +1469,7 @@ const createNewChat = async () => {
     if (data.success) {
       currentConversationId.value = data.data.id;
       window.location.hash = data.data.id;
-      messages.value = [];
+      chatSetMessages([]);
       conversations.value.unshift(data.data);
     }
   } catch (err) {
@@ -1414,7 +1489,8 @@ const selectConversation = async (id, updateUrl = true) => {
     const res = await fetchAPI(`/api/chat/conversations/${id}/messages`);
     const data = await res.json();
     if (data.success) {
-      messages.value = data.data;
+      // D1 行 → UIMessage（含 metadata），交由 useChat 渲染
+      chatSetMessages((data.data || []).map(dbMessageToUIMessage));
 
       // 初始化 stoppedMessages 集合（从 metadata 中读取停止状态）
       stoppedMessages.value = new Set();
@@ -1453,7 +1529,7 @@ const deleteConversation = async (id) => {
       // 如果删除的是当前对话，清空消息并清除 URL
       if (currentConversationId.value === id) {
         currentConversationId.value = null;
-        messages.value = [];
+        chatSetMessages([]);
         window.location.hash = '';
       }
     }
@@ -1539,11 +1615,19 @@ const getFileExtension = (filename) => {
 
 // ============================================
 // 文生图：生成图片的展示辅助
+// 兼容两种来源：
+// 1. metadata.attachments（D1 历史消息与刷新后）
+// 2. parts 中的 data-image（流式生成中实时下发）
 // ============================================
 // 获取消息中的生成图片附件列表
 const getGeneratedImages = (msg) => {
-  if (!msg?.metadata?.attachments || !Array.isArray(msg.metadata.attachments)) return [];
-  return msg.metadata.attachments.filter(a => a.type === 'generated_image' && a.url);
+  const fromMetadata = (msg?.metadata?.attachments && Array.isArray(msg.metadata.attachments))
+    ? msg.metadata.attachments.filter(a => a.type === 'generated_image' && a.url)
+    : [];
+  const fromParts = (msg?.parts || [])
+    .filter(p => p.type === 'data-image' && p.data?.url)
+    .map(p => ({ type: 'generated_image', url: p.data.url, model: p.data.model }));
+  return [...fromMetadata, ...fromParts];
 };
 
 // 判断消息是否包含生成图片
@@ -1823,155 +1907,43 @@ const sendMessage = async () => {
   inputMessage.value = '';
   if (inputArea.value) inputArea.value.style.height = 'auto';
 
-  // 准备附件
+  // 准备附件（经 chatExtras 注入请求 body，由后端装配为多模态 parts）
   const attachments = uploadedFiles.value.map(f => ({
     type: f.type,
     url: f.url,
     name: f.name,
     content: f.content, // 文档文件的文本内容
   }));
-
-  // 清空已上传文件
   uploadedFiles.value = [];
 
-  // 创建临时用户消息 ID
-  const tempUserMsgId = Date.now();
-  messages.value.push({
-    id: tempUserMsgId,
-    role: 'user',
-    content: userMessage,
-    created_at: new Date().toISOString(),
-    metadata: attachments.length > 0 ? { attachments } : undefined,
-  });
+  // 更新发送载荷（deep_think / workflow_id / attachments）
+  chatExtras.value = {
+    deep_think: deepThink.value,
+    workflow_id: selectedWorkflow.value?.id || null,
+    attachments,
+  };
 
   scrollToBottom();
-  isStreaming.value = true;
-
-  // 创建临时的 AI 消息用于显示思考状态
-  const tempAiMsgId = `temp-${Date.now()}`;
-  messages.value.push({
-    id: tempAiMsgId,
-    role: 'assistant',
-    content: '',
-    created_at: new Date().toISOString(),
-  });
-  currentStreamingMessageId.value = tempAiMsgId;
-
-  // 创建 AbortController
-  abortController.value = new AbortController();
 
   try {
-    const res = await fetchAPI(`/api/chat/conversations/${currentConversationId.value}/messages`, {
-      method: 'POST',
-      body: JSON.stringify({
-        message: userMessage,
-        stream: true,
-        deep_think: deepThink.value,
-        attachments: attachments,
-        workflow_id: selectedWorkflow.value?.id || null,
-      }),
-      signal: abortController.value.signal,
+    // useChat 全托管：乐观更新用户消息、流式接收 assistant 回复（含 data-image parts）
+    await chatSendMessage({
+      text: userMessage,
+      metadata: attachments.length > 0 ? { attachments } : {},
     });
-
-    // 检查 HTTP 响应状态
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      // 特殊处理额度不足错误
-      if (res.status === 429 && errorData.error?.code === 'QUOTA_EXCEEDED') {
-        throw new Error('今日额度已用完，请明天UTC 00:00重置后再试');
-      }
-      throw new Error(errorData.error?.message || `请求失败 (${res.status})`);
-    }
-
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let realMessageCreated = false;
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      const chunk = decoder.decode(value);
-      const lines = chunk.split('\n');
-
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          try {
-            const data = JSON.parse(line.substring(6));
-            if (data.type === 'start') {
-              // 收到 start 事件，更新消息的真实 ID
-              // 1. 更新用户消息 ID
-              if (data.user_message_id) {
-                const userMsgIndex = messages.value.findIndex(m => m.id === tempUserMsgId);
-                if (userMsgIndex !== -1) {
-                  messages.value[userMsgIndex].id = data.user_message_id;
-                }
-              }
-              // 2. 更新 AI 消息 ID
-              if (data.message_id) {
-                const aiMsgIndex = messages.value.findIndex(m => m.id === tempAiMsgId);
-                if (aiMsgIndex !== -1) {
-                  messages.value[aiMsgIndex].id = data.message_id;
-                  currentStreamingMessageId.value = data.message_id;
-                }
-              }
-              realMessageCreated = true;
-            } else if (data.type === 'chunk') {
-              // 找到当前正在流式传输的消息并追加内容
-              const msgIndex = messages.value.findIndex(m => m.id === currentStreamingMessageId.value);
-              if (msgIndex !== -1) {
-                messages.value[msgIndex].content += data.content;
-                scrollToBottom();
-              }
-            } else if (data.type === 'image') {
-              // 文生图：接收生成的图片（R2 地址）
-              const msgIndex = messages.value.findIndex(m => m.id === currentStreamingMessageId.value);
-              if (msgIndex !== -1) {
-                if (!messages.value[msgIndex].metadata) {
-                  messages.value[msgIndex].metadata = {};
-                }
-                if (!messages.value[msgIndex].metadata.attachments) {
-                  messages.value[msgIndex].metadata.attachments = [];
-                }
-                messages.value[msgIndex].metadata.attachments.push({
-                  type: 'generated_image',
-                  url: data.url,
-                  model: data.model,
-                });
-                scrollToBottom();
-              }
-            } else if (data.type === 'error') {
-              // AI 生成错误
-              throw new Error(formatAIError(data.message));
-            } else if (data.type === 'done') {
-              // 生成完成
-              stoppedMessages.value.delete(currentStreamingMessageId.value);
-              currentStreamingMessageId.value = null;
-            }
-          } catch (parseError) {
-            // JSON 解析错误，可能是数据不完整
-            console.warn('Parse SSE data error:', parseError, 'Raw:', line);
-            // 继续处理其他行，不中断
-          }
-        }
-      }
-    }
 
     // 更新对话标题（如果是第一条消息）
     const convIndex = conversations.value.findIndex(c => c.id === currentConversationId.value);
     if (convIndex !== -1 && conversations.value[convIndex].title === '新对话') {
-      // 智能生成标题：提取关键内容，去除标点和多余字符
       let newTitle = userMessage
-        .replace(/[^\w一-龥\s]/g, '') // 保留中英文和空格
+        .replace(/[^\w一-龥\s]/g, '')
         .trim()
         .substring(0, 30);
 
-      // 如果标题太短，保留原样
       if (newTitle.length < 2) {
         newTitle = userMessage.substring(0, 30);
       }
 
-      // 调用后端 API 更新标题
       try {
         await fetchAPI(`/api/chat/conversations/${currentConversationId.value}`, {
           method: 'PATCH',
@@ -1980,50 +1952,15 @@ const sendMessage = async () => {
         conversations.value[convIndex].title = newTitle;
       } catch (err) {
         console.error('Update title error:', err);
-        // 即使更新失败，也在本地更新标题
         conversations.value[convIndex].title = newTitle;
       }
     }
   } catch (err) {
-    // 删除临时消息（用户消息和 AI 消息）
-    // 注意：如果收到过 start 事件，消息 ID 已更新为真实 ID，需要查找真实位置
-    if (err.name === 'AbortError') {
-      // 用户主动取消
-      console.log('Generation stopped by user');
-      // 如果已经收到 start 事件，消息已保存到数据库，不删除
-      // 如果还没收到 start 事件，需要删除临时消息
-      if (!realMessageCreated) {
-        // 删除临时用户消息
-        const userMsgIndex = messages.value.findIndex(m => m.id === tempUserMsgId);
-        if (userMsgIndex !== -1) {
-          messages.value.splice(userMsgIndex, 1);
-        }
-        // 删除临时 AI 消息
-        const aiMsgIndex = messages.value.findIndex(m => m.id === tempAiMsgId);
-        if (aiMsgIndex !== -1) {
-          messages.value.splice(aiMsgIndex, 1);
-        }
-      }
-    } else {
-      // 其他错误，删除消息并提示
-      const userMsgIndex = messages.value.findIndex(m => m.id === tempUserMsgId || m.role === 'user' && messages.value.indexOf(m) === messages.value.length - 2);
-      if (userMsgIndex !== -1) {
-        messages.value.splice(userMsgIndex, 1);
-      }
-
-      const aiMsgIndex = messages.value.findIndex(m => m.id === tempAiMsgId || m.role === 'assistant' && messages.value.indexOf(m) === messages.value.length - 1);
-      if (aiMsgIndex !== -1) {
-        messages.value.splice(aiMsgIndex, 1);
-      }
-
-      console.error('Send message error:', err);
-      await dialog.showError(err.message || '发送失败，请重试');
-    }
-    currentStreamingMessageId.value = null;
+    console.error('Send message error:', err);
+    await dialog.showError(formatAIError(err.message) || '发送失败，请重试');
   } finally {
-    isStreaming.value = false;
-    abortController.value = null;
-    // 刷新额度
+    // 重置载荷并刷新额度
+    chatExtras.value = { deep_think: false, workflow_id: null, attachments: [] };
     fetchQuota();
   }
 };
@@ -2033,42 +1970,34 @@ const sendSuggestion = async (text) => {
   await sendMessage();
 };
 
-// 停止生成
+// 停止生成：useChat stop() → 后端 abortSignal 触发 → onEnd(isAborted) 持久化半截内容
 const stopGeneration = async () => {
-  if (abortController.value) {
-    abortController.value.abort();
-    abortController.value = null;
-  }
-
-  // 保存部分生成的内容并标记为已停止
-  if (currentStreamingMessageId.value && messages.value.length > 0) {
-    const lastMsgIndex = messages.value.length - 1;
-    const lastMsg = messages.value[lastMsgIndex];
-
-    if (lastMsg.role === 'assistant' && lastMsg.content && currentStreamingMessageId.value === lastMsg.id) {
-      try {
-        // 调用后端保存部分内容
-        const res = await fetchAPI(`/api/chat/conversations/${currentConversationId.value}/messages/${currentStreamingMessageId.value}/partial`, {
-          method: 'POST',
-          body: JSON.stringify({ content: lastMsg.content }),
-        });
-
-        const data = await res.json();
-        if (data.success) {
-          // 标记为已停止，显示"继续生成"按钮
-          stoppedMessages.value.add(currentStreamingMessageId.value);
-        }
-      } catch (err) {
-        console.error('Save partial message error:', err);
-      }
-    }
-  }
-
-  isStreaming.value = false;
-  currentStreamingMessageId.value = null;
+  chatStop();
+  // 后端保存 stopped 标记后，刷新消息以显示"继续生成"按钮
+  setTimeout(async () => {
+    await refreshCurrentMessages();
+    fetchQuota();
+  }, 600);
 };
 
-// 继续生成
+// 从服务器刷新当前对话消息（同步 stopped 状态与最新内容）
+const refreshCurrentMessages = async () => {
+  if (!currentConversationId.value) return;
+  try {
+    const res = await fetchAPI(`/api/chat/conversations/${currentConversationId.value}/messages`);
+    const data = await res.json();
+    if (data.success) {
+      chatSetMessages((data.data || []).map(dbMessageToUIMessage));
+      stoppedMessages.value = new Set(
+        (data.data || []).filter(m => m.role === 'assistant' && m.metadata?.stopped).map(m => m.id)
+      );
+    }
+  } catch (err) {
+    console.error('Refresh messages error:', err);
+  }
+};
+
+// 继续生成：专用端点（UIMessageStream），流式追加到目标消息
 const continueGeneration = async (messageIndex) => {
   if (isContinuing.value) return;
 
@@ -2080,57 +2009,60 @@ const continueGeneration = async (messageIndex) => {
   try {
     const response = await fetchAPI(`/api/chat/conversations/${currentConversationId.value}/continue`, {
       method: 'POST',
-      headers: {
-        'Accept': 'text/event-stream',
-      },
+      headers: { 'Accept': 'text/event-stream' },
       body: JSON.stringify({
         message_id: msg.id,
         existing_content: msg.content,
-        stream: true,
       }),
     });
 
     if (!response.ok) {
-      throw new Error('请求失败');
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || `请求失败 (${response.status})`);
     }
 
+    // 解析 UIMessageStream SSE：text-delta 增量追加
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
+    let buffer = '';
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
+      buffer += decoder.decode(value, { stream: true });
 
-      const chunk = decoder.decode(value);
-      const lines = chunk.split('\n');
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
 
       for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          try {
-            const data = JSON.parse(line.slice(6));
-
-            if (data.type === 'chunk') {
-              messages.value[messageIndex].content += data.content;
-              scrollToBottom();
-            } else if (data.type === 'error') {
-              // AI 生成错误
-              throw new Error(formatAIError(data.message));
-            } else if (data.type === 'done') {
-              // 从停止集合中移除
-              stoppedMessages.value.delete(msg.id);
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const chunk = JSON.parse(line.slice(6));
+          if (chunk.type === 'text-delta' && chunk.delta) {
+            // 追加到目标消息（本地直接更新 chatMessages 对应 part）
+            const target = chatMessages.value.find(m => m.id === msg.id);
+            if (target && target.parts?.length > 0) {
+              const textPart = target.parts.find(p => p.type === 'text');
+              if (textPart) textPart.text += chunk.delta;
+              else target.parts.push({ type: 'text', text: chunk.delta });
             }
-          } catch (parseError) {
-            // JSON 解析错误或业务错误
-            if (parseError.message && !parseError.message.includes('JSON')) {
-              // 业务错误（来自 error 类型），向上抛出
-              throw parseError;
-            }
-            // JSON 解析错误，记录日志继续处理
-            console.warn('Parse SSE data error:', parseError, 'Raw:', line);
+            scrollToBottom();
+          } else if (chunk.type === 'error') {
+            throw new Error(formatAIError(chunk.errorText || chunk.message));
+          } else if (chunk.type === 'finish') {
+            stoppedMessages.value.delete(msg.id);
           }
+        } catch (parseError) {
+          if (parseError.message && !parseError.message.includes('JSON')) {
+            throw parseError;
+          }
+          console.warn('Parse SSE data error:', parseError, 'Raw:', line);
         }
       }
     }
+
+    // 与服务端最终内容对齐（继续生成会拼接 existing + completion）
+    await refreshCurrentMessages();
 
   } catch (err) {
     console.error('Continue generation error:', err);
@@ -2143,7 +2075,6 @@ const continueGeneration = async (messageIndex) => {
 // 格式化 AI 错误消息
 const formatAIError = (errorMessage) => {
   if (!errorMessage) return 'AI 生成失败，请稍后重试';
-  // 提取更友好的错误信息
   if (errorMessage.includes('internal error')) {
     return 'AI 服务暂时不可用，请稍后重试';
   } else if (errorMessage.includes('rate limit') || errorMessage.includes('429')) {
@@ -2160,13 +2091,11 @@ const formatAIError = (errorMessage) => {
 const copyMessage = async (content) => {
   try {
     await navigator.clipboard.writeText(content);
-    // 先关闭旧弹窗
     if (copyAlertVisible.value) {
       copyAlertVisible.value = false;
       await nextTick();
       await new Promise(resolve => setTimeout(resolve, 50));
     }
-    // 显示新弹窗
     copyAlertKey.value++;
     copyAlertVisible.value = true;
   } catch (err) {
@@ -2175,12 +2104,10 @@ const copyMessage = async (content) => {
   }
 };
 
-// 重新生成
+// 重新生成：删除尾部 assistant 消息后，由 /generate 重新生成
 const regenerateMessage = async (messageIndex) => {
-  // 防止重复点击
   if (isStreaming.value || isRegenerating.value) return;
 
-  // 找到用户消息（AI 回复的前一条）
   const userMsgIndex = messageIndex - 1;
   if (userMsgIndex < 0 || messages.value[userMsgIndex].role !== 'user') {
     await dialog.showError('无法重新生成');
@@ -2197,16 +2124,13 @@ const regenerateMessage = async (messageIndex) => {
   const aiMsg = messages.value[messageIndex];
 
   try {
-    // 如果 AI 消息是临时 ID 或空内容（表示失败的消息），跳过后端删除
-    const isTempMessage = aiMsg.id.toString().startsWith('temp-');
+    const isTempMessage = String(aiMsg.id).startsWith('temp-');
     const isEmptyMessage = !aiMsg.content;
 
     if (!isTempMessage && !isEmptyMessage) {
-      // 调用后端 API 删除该 AI 回复及之后的所有消息
       const res = await fetchAPI(`/api/chat/conversations/${currentConversationId.value}/messages/${aiMsg.id}`, {
         method: 'DELETE',
       });
-
       const data = await res.json();
       if (!data.success) {
         await dialog.showError(data.error.message || '重新生成失败');
@@ -2215,10 +2139,10 @@ const regenerateMessage = async (messageIndex) => {
       }
     }
 
-    // 删除本地消息（从该 AI 回复开始到末尾）
-    messages.value.splice(messageIndex);
+    // 本地移除该 AI 回复及之后的消息
+    chatSetMessages(chatMessages.value.slice(0, messageIndex));
 
-    // 使用 generateAIResponse 重新生成（不重复保存用户消息）
+    // 重新生成（不重复保存用户消息）
     await generateAIResponse();
 
   } catch (err) {
@@ -2243,7 +2167,6 @@ const cancelMessageEdit = () => {
 
 // 保存消息编辑（发送编辑后的消息）
 const saveMessageEdit = async (index) => {
-  // 防止重复点击
   if (isSavingEdit.value) return;
 
   if (!editingContent.value.trim()) {
@@ -2263,7 +2186,6 @@ const saveMessageEdit = async (index) => {
   const msg = messages.value[index];
   const newContent = editingContent.value.trim();
 
-  // 调用后端API更新消息
   try {
     const res = await fetchAPI(`/api/chat/conversations/${currentConversationId.value}/messages/${msg.id}`, {
       method: 'PUT',
@@ -2278,23 +2200,22 @@ const saveMessageEdit = async (index) => {
       return;
     }
 
-    // 更新本地消息内容
-    // 注意：metadata 已在数据库中保留，前端本地消息也已有 metadata（附件信息）
-    messages.value[index].content = newContent;
-
     // 取消编辑模式
     editingMessageIndex.value = null;
     editingContent.value = '';
 
-    // 删除该消息之后的所有消息（本地）
-    const messagesToDelete = messages.value.length - index - 1;
-    if (messagesToDelete > 0) {
-      messages.value.splice(index + 1, messagesToDelete);
-    }
-
-    // 如果是用户消息，重新生成 AI 回复
     if (msg.role === 'user') {
+      // 用户消息：截断后续并重新生成 AI 回复
+      chatSetMessages(chatMessages.value.slice(0, index + 1));
+      // 更新被编辑消息文本
+      const target = chatMessages.value[index];
+      if (target?.parts?.length > 0) {
+        const textPart = target.parts.find(p => p.type === 'text');
+        if (textPart) textPart.text = newContent;
+      }
       await generateAIResponse();
+    } else {
+      await refreshCurrentMessages();
     }
 
   } catch (err) {
@@ -2305,29 +2226,18 @@ const saveMessageEdit = async (index) => {
   }
 };
 
-// 生成AI回复（不保存用户消息）
+// 生成AI回复（不保存用户消息，用于编辑后重新生成）
+// 走 /generate 专用端点（UIMessageStream），手动消费流并合入 chatMessages
 const generateAIResponse = async () => {
   if (!currentConversationId.value) return;
 
-  isStreaming.value = true;
-  currentStreamingMessageId.value = null;
-
-  // 不再预先创建临时消息，等收到 start 事件后再创建
-  const tempAiMsgId = `temp-regen-${Date.now()}`;
-
   try {
-    // 使用 /generate 接口，只生成AI回复，不保存用户消息
     const response = await fetchAPI(`/api/chat/conversations/${currentConversationId.value}/generate`, {
       method: 'POST',
-      headers: {
-        'Accept': 'text/event-stream',
-      },
-      body: JSON.stringify({
-        stream: true,
-      }),
+      headers: { 'Accept': 'text/event-stream' },
+      body: JSON.stringify({}),
     });
 
-    // 检查 HTTP 响应状态
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.error?.message || `请求失败 (${response.status})`);
@@ -2335,97 +2245,57 @@ const generateAIResponse = async () => {
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
+    let buffer = '';
 
-    let messageCreated = false;
+    // 新 assistant 消息（本地构建，结束后由 refreshCurrentMessages 对齐服务端 ID）
+    const localId = 'regen-' + Date.now();
+    let newText = '';
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
+      buffer += decoder.decode(value, { stream: true });
 
-      const chunk = decoder.decode(value);
-      const lines = chunk.split('\n');
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
 
       for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          try {
-            const data = JSON.parse(line.slice(6));
-
-            if (data.type === 'start') {
-              // 收到 start 事件后才创建消息
-              const realMessageId = data.message_id;
-              messages.value.push({
-                id: realMessageId,
-                role: 'assistant',
-                content: '',
-                created_at: new Date().toISOString(),
-              });
-              currentStreamingMessageId.value = realMessageId;
-              messageCreated = true;
-            } else if (data.type === 'chunk') {
-              // 找到当前消息并追加内容
-              if (currentStreamingMessageId.value) {
-                const aiMsgIndex = messages.value.findIndex(m => m.id === currentStreamingMessageId.value);
-                if (aiMsgIndex !== -1) {
-                  messages.value[aiMsgIndex].content += data.content;
-                  scrollToBottom();
-                }
-              }
-            } else if (data.type === 'image') {
-              // 文生图：接收生成的图片（R2 地址）
-              if (currentStreamingMessageId.value) {
-                const aiMsgIndex = messages.value.findIndex(m => m.id === currentStreamingMessageId.value);
-                if (aiMsgIndex !== -1) {
-                  if (!messages.value[aiMsgIndex].metadata) {
-                    messages.value[aiMsgIndex].metadata = {};
-                  }
-                  if (!messages.value[aiMsgIndex].metadata.attachments) {
-                    messages.value[aiMsgIndex].metadata.attachments = [];
-                  }
-                  messages.value[aiMsgIndex].metadata.attachments.push({
-                    type: 'generated_image',
-                    url: data.url,
-                    model: data.model,
-                  });
-                  scrollToBottom();
-                }
-              }
-            } else if (data.type === 'error') {
-              // AI 生成错误
-              throw new Error(formatAIError(data.message));
-            } else if (data.type === 'done') {
-              // 生成完成
-              stoppedMessages.value.delete(currentStreamingMessageId.value);
-              currentStreamingMessageId.value = null;
-            }
-          } catch (parseError) {
-            // JSON 解析错误或业务错误
-            if (parseError.message && !parseError.message.includes('JSON')) {
-              // 业务错误（来自 error 类型），向上抛出
-              throw parseError;
-            }
-            // JSON 解析错误，记录日志继续处理
-            console.warn('Parse SSE data error:', parseError, 'Raw:', line);
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const chunk = JSON.parse(line.slice(6));
+          if (chunk.type === 'text-delta' && chunk.delta) {
+            newText += chunk.delta;
+            scrollToBottom();
+          } else if (chunk.type === 'error') {
+            throw new Error(formatAIError(chunk.errorText || chunk.message));
           }
+        } catch (parseError) {
+          if (parseError.message && !parseError.message.includes('JSON')) {
+            throw parseError;
+          }
+          console.warn('Parse SSE data error:', parseError, 'Raw:', line);
         }
       }
     }
 
-  } catch (err) {
-    // 删除临时 AI 消息（如果已创建）
-    if (currentStreamingMessageId.value) {
-      const aiMsgIndex = messages.value.findIndex(m => m.id === currentStreamingMessageId.value);
-      if (aiMsgIndex !== -1) {
-        messages.value.splice(aiMsgIndex, 1);
-      }
+    if (newText) {
+      chatMessages.value.push({
+        id: localId,
+        role: 'assistant',
+        parts: [{ type: 'text', text: newText }],
+        metadata: {},
+      });
     }
-    currentStreamingMessageId.value = null;
 
+    // 与服务端对齐（获取真实消息 ID 与 metadata）
+    await refreshCurrentMessages();
+
+  } catch (err) {
     console.error('Generate AI response error:', err);
     await dialog.showError(err.message || '生成回复失败');
-  } finally {
-    isStreaming.value = false;
   }
 };
+
 
 // 分享对话
 const shareConversation = async (conversationId) => {
