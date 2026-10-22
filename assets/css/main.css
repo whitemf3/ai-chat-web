@@ -1392,24 +1392,30 @@ body {
 }
 
 .message-avatar {
-  width: 30px;
-  height: 30px;
-  border-radius: 4px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 600;
   font-size: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  transition: transform 0.2s ease;
+}
+
+.message:hover .message-avatar {
+  transform: scale(1.05);
 }
 
 .message-avatar.user {
-  background: #5436da;
+  background: linear-gradient(135deg, #6a4dfc, #5436da);
   color: white;
 }
 
 .message-avatar.assistant {
-  background: #19c37d;
+  background: linear-gradient(135deg, #1fd98a, #19c37d);
   color: white;
 }
 
@@ -1417,6 +1423,7 @@ body {
   flex: 1;
   line-height: 1.75;
   font-size: 15px;
+  word-break: break-word;
 }
 
 .message-content p {
@@ -1427,18 +1434,52 @@ body {
   margin-bottom: 0;
 }
 
+/* 流式输出中的打字光标（由模板在 streaming 时追加） */
+.message-content .streaming-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 1.05em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: #19c37d;
+  border-radius: 2px;
+  animation: cursor-blink 1s steps(2) infinite;
+}
+
+@keyframes cursor-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* 代码块：卡片化 + 顶部装饰条 */
 .message-content pre {
+  position: relative;
   background: #f6f8fa;
   border: 1px solid #e1e4e8;
-  border-radius: 6px;
+  border-radius: 10px;
   padding: 16px;
+  padding-top: 20px;
   overflow-x: auto;
   margin: 1em 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.message-content pre::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #19c37d, #5436da);
+  border-radius: 10px 10px 0 0;
+  opacity: 0.7;
 }
 
 .dark .message-content pre {
   background: #161b22;
   border-color: #30363d;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .message-content pre code {
@@ -1465,6 +1506,80 @@ body {
 .dark .message-content code:not(pre code) {
   background: rgba(110, 118, 129, 0.4);
   color: #c9d1d9;
+}
+
+/* Markdown 表格美化 */
+.message-content table {
+  border-collapse: collapse;
+  margin: 1em 0;
+  width: 100%;
+  font-size: 14px;
+}
+
+.message-content th,
+.message-content td {
+  border: 1px solid #e1e4e8;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.message-content th {
+  background: #f6f8fa;
+  font-weight: 600;
+}
+
+.message-content tr:nth-child(even) td {
+  background: #fbfbfd;
+}
+
+.dark .message-content th,
+.dark .message-content td {
+  border-color: #30363d;
+}
+
+.dark .message-content th {
+  background: #1c2129;
+}
+
+.dark .message-content tr:nth-child(even) td {
+  background: #1a1f27;
+}
+
+/* 引用块 */
+.message-content blockquote {
+  margin: 1em 0;
+  padding: 8px 16px;
+  border-left: 3px solid #19c37d;
+  background: rgba(25, 195, 125, 0.06);
+  border-radius: 0 8px 8px 0;
+  color: #57606a;
+}
+
+.dark .message-content blockquote {
+  border-left-color: #1fd98a;
+  background: rgba(31, 217, 138, 0.08);
+  color: #a5b0bb;
+}
+
+/* 链接 */
+.message-content a {
+  color: #5436da;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(84, 54, 218, 0.3);
+  transition: border-color 0.2s;
+}
+
+.message-content a:hover {
+  border-bottom-color: #5436da;
+}
+
+.dark .message-content a {
+  color: #9d8bff;
+  border-bottom-color: rgba(157, 139, 255, 0.3);
+}
+
+.dark .message-content a:hover {
+  border-bottom-color: #9d8bff;
 }
 
 .message-wrapper {
@@ -2154,22 +2269,42 @@ body {
   align-items: center;
   justify-content: center;
   padding: 20px;
+  animation: welcome-fade-up 0.5s ease;
+}
+
+@keyframes welcome-fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .welcome-logo {
   font-size: 48px;
   margin-bottom: 24px;
+  animation: logo-float 3s ease-in-out infinite;
+}
+
+@keyframes logo-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
 }
 
 .welcome-title {
   font-size: 32px;
-  font-weight: 600;
+  font-weight: 700;
   margin-bottom: 16px;
   color: #202123;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, #202123 30%, #5436da 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .dark .welcome-title {
-  color: #ececf1;
+  background: linear-gradient(135deg, #ececf1 30%, #9d8bff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .welcome-subtitle {
@@ -2178,6 +2313,7 @@ body {
   margin-bottom: 32px;
   text-align: center;
   max-width: 600px;
+  line-height: 1.7;
 }
 
 .welcome-suggestions {
@@ -2195,25 +2331,58 @@ body {
 }
 
 .suggestion-card {
-  padding: 16px;
-  background: #f4f4f4;
-  border-radius: 8px;
+  position: relative;
+  padding: 16px 18px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   text-align: left;
   font-size: 14px;
+  color: #374151;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
 }
 
-.dark .suggestion-card {
-  background: #444654;
+.suggestion-card::after {
+  content: '→';
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  color: #5436da;
+  font-size: 15px;
 }
 
 .suggestion-card:hover {
-  background: #e4e4e4;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(84, 54, 218, 0.12);
+  border-color: rgba(84, 54, 218, 0.35);
+}
+
+.suggestion-card:hover::after {
+  opacity: 1;
+  transform: translateY(-50%) translateX(2px);
+}
+
+.dark .suggestion-card {
+  background: #2f3039;
+  border-color: rgba(255, 255, 255, 0.09);
+  color: #d5d7e0;
+  box-shadow: none;
+}
+
+.dark .suggestion-card::after {
+  color: #9d8bff;
 }
 
 .dark .suggestion-card:hover {
-  background: #545563;
+  background: #36373f;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+  border-color: rgba(157, 139, 255, 0.4);
 }
 
 /* ============================================

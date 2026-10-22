@@ -652,9 +652,13 @@
                     <!-- 正常回答内容 -->
                     <div v-if="parseThinkContent(msg.content).answer" class="answer-content">
                       <div v-html="renderMarkdown(parseThinkContent(msg.content).answer)"></div>
+                      <span v-if="isStreaming && currentStreamingMessageId === msg.id" class="streaming-cursor"></span>
                     </div>
                     <!-- 没有思考过程的普通消息 -->
-                    <div v-else-if="!parseThinkContent(msg.content).thinking" v-html="renderMarkdown(msg.content)"></div>
+                    <div v-else-if="!parseThinkContent(msg.content).thinking" class="answer-content">
+                      <span v-html="renderMarkdown(msg.content)"></span>
+                      <span v-if="isStreaming && currentStreamingMessageId === msg.id" class="streaming-cursor"></span>
+                    </div>
                   </div>
                   <!-- 用户消息 -->
                   <div v-else v-html="renderMarkdown(msg.content)"></div>
@@ -1147,6 +1151,23 @@ const chatSetMessages = (msgs) => {
 watch(chatError, (err) => {
   if (err) {
     dialog.showError(formatAIError(err.message) || 'AI 生成失败，请稍后重试');
+  }
+});
+
+// 流式期间自动滚动跟随新内容（useChat 更新 messages 时触发）
+const lastMessageTextLength = () => {
+  const last = chatMessages.value[chatMessages.value.length - 1];
+  if (!last?.parts) return 0;
+  return last.parts.reduce((sum, p) => sum + (p.type === 'text' ? (p.text?.length || 0) : 0), 0);
+};
+
+watch(lastMessageTextLength, () => {
+  if (isStreaming.value) {
+    // 仅当用户已在底部附近时才跟随，避免打断向上翻阅
+    const el = messagesContainer.value;
+    if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 160) {
+      nextTick(() => { el.scrollTop = el.scrollHeight; });
+    }
   }
 });
 
@@ -2022,6 +2043,7 @@ const continueGeneration = async (messageIndex) => {
     }
 
     // 解析 UIMessageStream SSE：text-delta 增量追加
+    // 注意：chatMessages 是 shallowRef，须以「替换消息对象」方式触发响应式更新
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
@@ -2039,12 +2061,19 @@ const continueGeneration = async (messageIndex) => {
         try {
           const chunk = JSON.parse(line.slice(6));
           if (chunk.type === 'text-delta' && chunk.delta) {
-            // 追加到目标消息（本地直接更新 chatMessages 对应 part）
-            const target = chatMessages.value.find(m => m.id === msg.id);
-            if (target && target.parts?.length > 0) {
-              const textPart = target.parts.find(p => p.type === 'text');
-              if (textPart) textPart.text += chunk.delta;
-              else target.parts.push({ type: 'text', text: chunk.delta });
+            // 追加到目标消息：替换消息对象（含新 parts 数组）以触发 shallowRef
+            const targetIndex = chatMessages.value.findIndex(m => m.id === msg.id);
+            if (targetIndex !== -1) {
+              const target = chatMessages.value[targetIndex];
+              const parts = target.parts?.length > 0 ? target.parts : [];
+              const textPart = parts.find(p => p.type === 'text');
+              const nextParts = textPart
+                ? parts.map(p => p === textPart ? { ...p, text: p.text + chunk.delta } : p)
+                : [...parts, { type: 'text', text: chunk.delta }];
+              // 浅层响应式：整体替换数组触发更新
+              chatSetMessages(chatMessages.value.map((m, i) =>
+                i === targetIndex ? { ...target, parts: nextParts } : m
+              ));
             }
             scrollToBottom();
           } else if (chunk.type === 'error') {
@@ -2206,13 +2235,17 @@ const saveMessageEdit = async (index) => {
 
     if (msg.role === 'user') {
       // 用户消息：截断后续并重新生成 AI 回复
-      chatSetMessages(chatMessages.value.slice(0, index + 1));
-      // 更新被编辑消息文本
-      const target = chatMessages.value[index];
-      if (target?.parts?.length > 0) {
-        const textPart = target.parts.find(p => p.type === 'text');
-        if (textPart) textPart.text = newContent;
+      // 浅层响应式：以替换方式更新被编辑消息文本
+      const base = chatMessages.value.slice(0, index + 1);
+      const target = base[index];
+      if (target) {
+        const parts = target.parts?.length > 0 ? target.parts : [{ type: 'text', text: '' }];
+        base[index] = {
+          ...target,
+          parts: parts.map(p => p.type === 'text' ? { ...p, text: newContent } : p),
+        };
       }
+      chatSetMessages(base);
       await generateAIResponse();
     } else {
       await refreshCurrentMessages();
@@ -2279,12 +2312,16 @@ const generateAIResponse = async () => {
     }
 
     if (newText) {
-      chatMessages.value.push({
-        id: localId,
-        role: 'assistant',
-        parts: [{ type: 'text', text: newText }],
-        metadata: {},
-      });
+      // 浅层响应式：以整体赋值方式追加消息
+      chatSetMessages([
+        ...chatMessages.value,
+        {
+          id: localId,
+          role: 'assistant',
+          parts: [{ type: 'text', text: newText }],
+          metadata: {},
+        },
+      ]);
     }
 
     // 与服务端对齐（获取真实消息 ID 与 metadata）
