@@ -98,7 +98,7 @@ const rowToMessage = (row: MessageRow): Message => {
         id: a.url,
         serverId: a.url,
         name: a.name ?? a.type,
-        size: 0,
+        size: (a as { size?: number }).size ?? 0,
         isImage: a.type === 'image',
         mimeType: a.type === 'image' ? 'image/*' : '',
         url: a.url,

@@ -54,12 +54,12 @@ export const SettingsDialog = () => {
 }
 
 const sections: { value: SettingsSection | 'account'; label: string; icon: ReactNode }[] = [
+  { value: 'account', label: 'settingDialogAsideAccountOptionLabel', icon: <IconUserOutline16 /> },
   {
     value: 'general',
     label: 'settingDialogAsideGeneralOptionLabel',
     icon: <IconSettingsOutline16 />,
   },
-  { value: 'account', label: 'settingDialogAsideAccountOptionLabel', icon: <IconUserOutline16 /> },
 ]
 
 const SettingsContent = () => {

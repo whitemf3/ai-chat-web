@@ -173,8 +173,7 @@ export const hasGeneratedImage = (reply: AssistantMessage) =>
 
 /**
  * 有回答文本（或生成图）的已结束回复才可续写；报错回复不能续写。
- * 文本回复需在输出上限处停止（后端按 max_tokens 截断时续写才有语义）；
- * 纯图片回复不支持续写（后端 /continue 会拒绝文生图模型）。
+ * 仅在用户主动停止（stopped）时提供续写入口；正常生成完毕不显示。
  */
 export const canContinueReply = (reply: AssistantMessage): boolean => {
   if (!reply.prefix || reply.status === 'error') {
@@ -183,10 +182,7 @@ export const canContinueReply = (reply: AssistantMessage): boolean => {
   if (hasGeneratedImage(reply)) {
     return false
   }
-  return (
-    reply.status === 'stopped' ||
-    (reply.status === 'done' && getReplyText(reply) !== '')
-  )
+  return reply.status === 'stopped'
 }
 
 /** 已结束或停止且有回答内容的回复才放进上下文 */
@@ -205,6 +201,8 @@ const toUserParam = ({ content, files }: UserMessage): unknown => {
       name: file.name,
       // 文本类附件带上内容，后端注入 [文档内容: ...] 供模型阅读
       ...(file.textContent ? { content: file.textContent } : {}),
+      // 保留原始大小，供历史会话附件卡片展示
+      ...(file.size ? { size: file.size } : {}),
     }))
   return {
     role: 'user' as const,
