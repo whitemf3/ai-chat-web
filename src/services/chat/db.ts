@@ -149,6 +149,20 @@ const rowToMessage = (row: MessageRow): Message => {
   }
 }
 
+/** 中断兜底：把用户已看到的回复内容写回后端（幂等；服务端更完整版本优先保留） */
+export const saveReplyPartial = async (
+  conversationId: string,
+  messageId: string,
+  content: string,
+  stopped: boolean
+): Promise<void> => {
+  await request(`/api/chat/conversations/${encodeURIComponent(conversationId)}/replies/${encodeURIComponent(messageId)}/save`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content, stopped }),
+  })
+}
+
 /** GET /api/chat/conversations/:id/messages → 完整会话（重建分支线性列表） */
 export const loadSession = async (id: string): Promise<Session | undefined> => {
   const rows = await getJson<MessageRow[]>(

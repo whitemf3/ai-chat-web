@@ -16,6 +16,7 @@ import { appendBranch, getVisibleMessages, normalizeSession, selectVersion } fro
 import {
   applyEvent,
   canContinueReply,
+  getReplyText,
   settleReply,
   toRequestMessages,
 } from './reply.js'
@@ -853,6 +854,14 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
       }
       flush()
       void refreshSessions()
+      // 兜底保存：流中断/断开时把用户已看到的内容写回后端（幂等，服务端更完整版本优先）
+      // 仅在已对齐服务端消息 ID 且有已显示内容时调用；失败静默（后端 tee 分支仍会尝试保存）
+      const partialText = getReplyText(reply)
+      if (partialText && sessionId === conversationId) {
+        void db
+          .saveReplyPartial(sessionId, reply.id, partialText, true)
+          .catch(() => {})
+      }
     }
   } finally {
     streamFlushes.delete(sessionId)
