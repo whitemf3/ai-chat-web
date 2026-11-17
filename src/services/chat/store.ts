@@ -782,6 +782,12 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
           flush()
         } else if (frame === 0) {
           frame = requestAnimationFrame(flush)
+          // 后台标签页 rAF 可能被节流，用短超时兜底保证打字机持续推进
+          setTimeout(() => {
+            if (frame !== 0) {
+              flush()
+            }
+          }, 100)
         }
       }
 
