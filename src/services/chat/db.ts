@@ -3,7 +3,7 @@
 // 替换 DeepSeek 版 IndexedDB：
 // - loadSessionSummaries → GET /api/chat/conversations
 // - loadSession          → GET /api/chat/conversations/:id/messages
-// - saveSession          → 后端流式 onEnd 自动持久化（前端无需写回）
+// - 生成结果由后端收尾持久化；主动停止额外保存前端可见前缀
 // - renameSession        → PATCH /api/chat/conversations/:id
 // - deleteSession        → DELETE /api/chat/conversations/:id
 // - uploadFile           → POST /api/files/upload（R2）
@@ -109,6 +109,7 @@ const rowToMessage = (row: MessageRow): Message => {
       content: row.content,
       createdAt: toDate(row.created_at),
       files: uploadAttachments,
+      ...metadata.branch,
     }
   }
 
@@ -144,40 +145,46 @@ const rowToMessage = (row: MessageRow): Message => {
     route: metadata.route,
     prefix: true,
     status: metadata.stopped ? 'stopped' : 'done',
+    stopReason: metadata.stopReason,
+    ...metadata.branch,
     blocks,
     ...(metadata.tokens ? { usage: { input: metadata.tokens.input ?? 0, output: metadata.tokens.output ?? 0 } } : {}),
   }
 }
 
-/** 中断兜底：把用户已看到的回复内容写回后端（幂等；服务端更完整版本优先保留） */
+/** 可见前缀覆盖同一代生成结果，迟到请求不能覆盖新的续写。 */
 export const saveReplyPartial = async (
   conversationId: string,
   messageId: string,
   content: string,
-  stopped: boolean
+  stopped: boolean,
+  generationId: string,
+  stopReason: 'aborted' | 'interrupted' = 'aborted'
 ): Promise<void> => {
   await request(`/api/chat/conversations/${encodeURIComponent(conversationId)}/replies/${encodeURIComponent(messageId)}/save`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content, stopped }),
+    body: JSON.stringify({ content, stopped, generation_id: generationId, stop_reason: stopReason }),
   })
 }
 
-/** GET /api/chat/conversations/:id/messages → 完整会话（重建分支线性列表） */
+/** 恢复消息树及服务端保存的版本选择。 */
 export const loadSession = async (id: string): Promise<Session | undefined> => {
   const rows = await getJson<MessageRow[]>(
     `/api/chat/conversations/${encodeURIComponent(id)}/messages`
   )
   // 会话标题从摘要行取不到，用占位（列表切换时由 store 以摘要覆盖）
   const messages = rows.map(rowToMessage)
-  // 后端为线性消息流；rootMessageId 留 undefined 交给 normalizeSession
-  // 构建单分支链（parentId/selectedChildId），getVisibleMessages 才能从根走通
+  const branched = rows.some((row) => row.metadata?.branch)
+  const root = rows.find((row) => row.metadata?.branch?.selectedRoot)
+    ?? rows.find((row) => row.metadata?.branch?.parentId === null)
   const session: Session = {
     id,
     title: '',
     createdAt: messages.length > 0 ? messages[0].createdAt : Date.now(),
     updatedAt: messages.length > 0 ? messages[messages.length - 1].createdAt : Date.now(),
     messages,
+    ...(branched ? { rootMessageId: root?.id ?? null } : {}),
   }
   return session
 }
@@ -196,20 +203,12 @@ export const deleteSession = async (id: string): Promise<void> => {
   await request(`/api/chat/conversations/${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
 
-/** PUT /api/chat/conversations/:cid/messages/:mid（编辑提问；后端按 rowid 截断后续消息） */
-export const editMessage = async (
-  conversationId: string,
-  messageId: string,
-  content: string
-): Promise<void> => {
-  await request(
-    `/api/chat/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}`,
-    {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content }),
-    }
-  )
+export const selectMessageVersion = async (conversationId: string, messageId: string): Promise<void> => {
+  await request(`/api/chat/conversations/${encodeURIComponent(conversationId)}/branch`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message_id: messageId }),
+  })
 }
 
 /** POST /api/chat/conversations（创建空对话；实际由后端首次发送时隐式创建，此处保留兼容） */

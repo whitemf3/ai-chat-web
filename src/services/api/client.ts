@@ -6,7 +6,7 @@
 // ============================================
 
 import { translate, type TranslationMessage } from '../../i18n/index.js'
-import { readServerSentEvents } from './sse.js'
+import { readServerSentEvents, StreamIdleTimeoutError } from './sse.js'
 import type { ApiErrorBody, UIStreamEvent } from './types.js'
 
 /** 构建期注入的后端 API 地址（rspack DefinePlugin __API_ORIGIN__） */
@@ -97,34 +97,38 @@ const readErrorResponse = async (
 }
 
 /** 统一鉴权请求：401/403 时登出（banned/expired） */
-export const request = async (path: string, init: RequestInit): Promise<Response> => {
+export const request = async (path: string, init: RequestInit, timeoutMs = 30_000): Promise<Response> => {
   const token = getToken()
-  let response: Response
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(new Error('Request timed out')), timeoutMs)
   try {
-    response = await fetch(
+    const response = await fetch(
       path.startsWith('http') ? path : `${API_ORIGIN}${path}`,
       {
         ...init,
+        signal: init.signal ? AbortSignal.any([init.signal, controller.signal]) : controller.signal,
         headers: {
           ...init.headers,
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       }
     )
+    if (response.status === 401 || response.status === 403) {
+      logout()
+      throw await readErrorResponse(response)
+    }
+    if (!response.ok) {
+      throw await readErrorResponse(response)
+    }
+    return response
   } catch (error) {
-    if (init.signal?.aborted) {
+    if (init.signal?.aborted || error instanceof ApiError) {
       throw error
     }
     throw new ApiError('network', error instanceof Error ? error.message : String(error))
+  } finally {
+    clearTimeout(timer)
   }
-  if (response.status === 401 || response.status === 403) {
-    logout()
-    throw await readErrorResponse(response)
-  }
-  if (!response.ok) {
-    throw await readErrorResponse(response)
-  }
-  return response
 }
 
 /** JSON 请求快捷封装 */
@@ -139,12 +143,7 @@ export const getJson = async <T>(path: string, signal?: AbortSignal): Promise<T>
   return body.data
 }
 
-/**
- * POST 发送消息并消费 UIMessageStream SSE。
- * 后端契约：POST /api/chat/conversations/:id/messages
- * 载荷：{ messages: UIMessage[], deep_think: boolean, temperature?, max_tokens? }
- * 响应：data: {...UIMessageChunk}\n\n（keep-alive 心跳由 SDK 注释帧承担）
- */
+/** 心跳保持下游连接，但只有明确的 stop 才算正常完成。 */
 export async function* streamMessage(
   conversationId: string,
   body: {
@@ -152,11 +151,17 @@ export async function* streamMessage(
     deep_think: boolean
     temperature?: number
     max_tokens?: number
+    parent_id?: string | null
+    assistant_message_id?: string
+    generation_id?: string
+    message_id?: string
+    existing_content?: string
   },
-  signal: AbortSignal
+  signal: AbortSignal,
+  action: 'messages' | 'generate' | 'continue' = 'messages'
 ): AsyncGenerator<UIStreamEvent> {
   const response = await request(
-    `/api/chat/conversations/${encodeURIComponent(conversationId)}/messages`,
+    `/api/chat/conversations/${encodeURIComponent(conversationId)}/${action}`,
     {
       method: 'POST',
       headers: {
@@ -164,10 +169,9 @@ export async function* streamMessage(
         Accept: 'text/event-stream',
       },
       body: JSON.stringify(body),
-      // 不给 fetch 传 abort：停止太快时请求会被取消于发出前，后端完全收不到
-      // 本条消息（用户消息与回复都不会保存）。停止改由读取循环 cancel 流实现，
-      // 连接断开后端仍能收到请求并保存半截内容。
-    }
+      signal,
+    },
+    120_000
   )
 
   const contentType = response.headers.get('Content-Type') ?? ''
@@ -175,30 +179,35 @@ export async function* streamMessage(
     throw await readErrorResponse(response, 'protocol', '')
   }
 
-  let seenFinish = false
-  for await (const { data } of readServerSentEvents(response.body, signal)) {
-    let payload: unknown
-    try {
-      payload = JSON.parse(data)
-    } catch {
-      continue
-    }
-    const event = readUIStreamEvent(payload)
-    if (event) {
+  try {
+    for await (const { data } of readServerSentEvents(response.body, signal)) {
+      let payload: unknown
+      try {
+        payload = JSON.parse(data)
+      } catch {
+        continue
+      }
+      const event = readUIStreamEvent(payload)
+      if (!event) {
+        continue
+      }
       if (event.type === 'error') {
         throw new ApiError('stream', event.errorText)
       }
+      yield event
       if (event.type === 'finish') {
-        seenFinish = true
-        yield event
         return
       }
-      yield event
     }
-  }
-  if (!seenFinish) {
-    // 服务端没有提供错误内容时保持为空，不推测、不猜测
-    throw new ApiError('interrupted', '')
+    throw new ApiError('interrupted', { key: 'replyInterrupted' })
+  } catch (error) {
+    if (signal.aborted || error instanceof ApiError) {
+      throw error
+    }
+    if (error instanceof StreamIdleTimeoutError) {
+      throw new ApiError('interrupted', { key: 'streamIdleTimeout' })
+    }
+    throw new ApiError('network', { key: 'replyInterrupted' })
   }
 }
 
@@ -253,6 +262,7 @@ const readUIStreamEvent = (payload: unknown): UIStreamEvent | null => {
     case 'finish':
       return {
         type: 'finish',
+        finishReason: typeof chunk.finishReason === 'string' ? chunk.finishReason : undefined,
         messageMetadata: (chunk.messageMetadata as Record<string, unknown>) || {},
       }
     default:

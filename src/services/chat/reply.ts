@@ -133,7 +133,10 @@ export const applyEvent = (
       const metadata = event.messageMetadata ?? {}
       const usage = metadata.usage as { input: number; output: number } | undefined
       const route = metadata.route as AssistantMessage['route'] | undefined
-      const stopReason = metadata.stopReason as AssistantMessage['stopReason']
+      const stopReason: AssistantMessage['stopReason'] =
+        event.finishReason === 'length' ? 'max_tokens'
+          : event.finishReason === 'stop' ? 'end_turn'
+            : (metadata.stopReason as AssistantMessage['stopReason']) ?? 'interrupted'
       return {
         ...next,
         ...(usage ? { usage } : {}),
@@ -144,6 +147,11 @@ export const applyEvent = (
     default:
       return next
   }
+}
+
+export const flushReplySplit = (reply: AssistantMessage, split: ThinkingSplitState, now: number) => {
+  const textIndex = reply.blocks.findLastIndex((block) => block.type === 'text')
+  return textIndex < 0 ? reply : appendSegments(reply, textIndex, flushThinkingSplit(split), now)
 }
 
 /** 回复结束：未结束的思考块以当前时间收尾。 */
@@ -171,18 +179,14 @@ export const getReplyText = (reply: AssistantMessage) =>
 export const hasGeneratedImage = (reply: AssistantMessage) =>
   reply.blocks.some((block) => block.type === 'image')
 
-/**
- * 有回答文本（或生成图）的已结束回复才可续写；报错回复不能续写。
- * 仅在用户主动停止（stopped）时提供续写入口；正常生成完毕不显示。
- */
 export const canContinueReply = (reply: AssistantMessage): boolean => {
-  if (!reply.prefix || reply.status === 'error') {
+  if (!reply.prefix || !getReplyText(reply) || hasGeneratedImage(reply)) {
     return false
   }
-  if (hasGeneratedImage(reply)) {
-    return false
-  }
-  return reply.status === 'stopped'
+  return reply.status === 'stopped' || (
+    reply.status === 'error' &&
+    (reply.error?.kind === 'interrupted' || reply.error?.kind === 'stream' || reply.error?.kind === 'network')
+  )
 }
 
 /** 已结束或停止且有回答内容的回复才放进上下文 */
@@ -192,7 +196,7 @@ const isUsableReply = (message: Message): message is AssistantMessage =>
   (getReplyText(message) !== '' || hasGeneratedImage(message))
 
 /** 用户消息：图片附件以后端 AttachmentLike 形态放入 metadata.attachments */
-const toUserParam = ({ content, files }: UserMessage): unknown => {
+const toUserParam = ({ id, content, files }: UserMessage): unknown => {
   const attachments = files
     .filter((file) => file.serverId)
     .map((file) => ({
@@ -205,6 +209,7 @@ const toUserParam = ({ content, files }: UserMessage): unknown => {
       ...(file.size ? { size: file.size } : {}),
     }))
   return {
+    id,
     role: 'user' as const,
     parts: [{ type: 'text' as const, text: content }],
     ...(attachments.length > 0 ? { metadata: { attachments } } : {}),
@@ -212,7 +217,7 @@ const toUserParam = ({ content, files }: UserMessage): unknown => {
 }
 
 /** assistant 消息：文本块进 parts，生成图进 metadata.attachments */
-const toAssistantParam = ({ blocks }: AssistantMessage): unknown => {
+const toAssistantParam = ({ id, blocks }: AssistantMessage): unknown => {
   const parts: Array<{ type: 'text'; text: string }> = []
   const imageAttachments: Array<{ type: string; url: string; model?: string }> = []
   for (const block of blocks) {
@@ -227,6 +232,7 @@ const toAssistantParam = ({ blocks }: AssistantMessage): unknown => {
     }
   }
   return {
+    id,
     role: 'assistant' as const,
     parts: parts.length > 0 ? parts : [{ type: 'text', text: '' }],
     ...(imageAttachments.length > 0 ? { metadata: { attachments: imageAttachments } } : {}),

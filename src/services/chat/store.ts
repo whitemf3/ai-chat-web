@@ -16,6 +16,7 @@ import { appendBranch, getVisibleMessages, normalizeSession, selectVersion } fro
 import {
   applyEvent,
   canContinueReply,
+  flushReplySplit,
   getReplyText,
   settleReply,
   toRequestMessages,
@@ -88,6 +89,49 @@ const streamFlushes = new Map<string, () => void>()
 let accessSequence = 0
 let initTask: Promise<void> | undefined
 const sessionLoads = new Map<string, { promise: Promise<void> }>()
+const branchSaves = new Map<string, Promise<void>>()
+const failedBranchSelections = new Map<string, string>()
+type PartialReplySave = { sessionId: string; messageId: string; content: string; generationId: string; stopReason: 'aborted' | 'interrupted' }
+const failedReplySaves = new Map<string, PartialReplySave>()
+const failedRequests = new Map<string, { reply: AssistantMessage; request: Request }>()
+
+const updateSaveError = (sessionId: string) => set((state) => ({
+  sessionSaveErrors: {
+    ...state.sessionSaveErrors,
+    [sessionId]: failedBranchSelections.has(sessionId) || failedRequests.has(sessionId) ||
+      [...failedReplySaves.values()].some(partial => partial.sessionId === sessionId),
+  },
+}))
+
+const savePartialReply = async (partial: PartialReplySave) => {
+  await db.saveReplyPartial(partial.sessionId, partial.messageId, partial.content, true, partial.generationId, partial.stopReason)
+  if (failedReplySaves.get(partial.messageId) === partial) {
+    failedReplySaves.delete(partial.messageId)
+  }
+  updateSaveError(partial.sessionId)
+}
+
+const saveBranchSelection = (sessionId: string, messageId: string) => {
+  const previous = branchSaves.get(sessionId) ?? Promise.resolve()
+  const task = previous.catch(() => {}).then(async () => {
+    try {
+      await db.selectMessageVersion(sessionId, messageId)
+      failedBranchSelections.delete(sessionId)
+      updateSaveError(sessionId)
+    } catch (error) {
+      failedBranchSelections.set(sessionId, messageId)
+      updateSaveError(sessionId)
+      db.reportStorageError('select branch')(error)
+      throw error
+    } finally {
+      if (branchSaves.get(sessionId) === task) {
+        branchSaves.delete(sessionId)
+      }
+    }
+  })
+  branchSaves.set(sessionId, task)
+  return task
+}
 
 const touchSession = (id: string) => sessionAccess.set(id, ++accessSequence)
 
@@ -102,6 +146,7 @@ const trimSessionCache = () => {
       (id) =>
         id !== state.activeId &&
         !Object.hasOwn(state.streaming, id) &&
+        !state.sessionSaveErrors[id] &&
         !deletingSessions.has(id)
     )
     .sort((a, b) => (sessionAccess.get(a) ?? 0) - (sessionAccess.get(b) ?? 0))
@@ -158,6 +203,7 @@ const renameMessage = (sessionId: string, oldId: string, newId: string) =>
     messages: session.messages.map((message) => ({
       ...(message.id === oldId ? { ...message, id: newId } : message),
       ...(message.selectedChildId === oldId ? { selectedChildId: newId } : {}),
+      ...(message.parentId === oldId ? { parentId: newId } : {}),
     })),
   }))
 
@@ -185,8 +231,19 @@ const bumpSessionList = (sessionId: string, patch: Partial<SessionSummary>) =>
   }))
 
 export const retrySaveSessions = () => {
-  // REST 后端：保存失败重试 = 重新拉取列表
-  void refreshSessions()
+  for (const [sessionId, messageId] of failedBranchSelections) {
+    if (!branchSaves.has(sessionId)) {
+      void saveBranchSelection(sessionId, messageId).catch(() => {})
+    }
+  }
+  for (const partial of failedReplySaves.values()) {
+    void savePartialReply(partial).catch(db.reportStorageError('save interrupted reply'))
+  }
+  for (const [sessionId, pending] of failedRequests) {
+    if (!getStreamController(sessionId) && !deletingSessions.has(sessionId)) {
+      void streamReply(sessionId, { ...pending.reply, status: 'pending', error: undefined }, pending.request)
+    }
+  }
 }
 
 /** 离开前先合并尚未绘制的增量；隐藏期间浏览器可能暂停动画帧。 */
@@ -385,6 +442,13 @@ const removeSessionData = async (id: string): Promise<boolean> => {
     await db.deleteSession(id)
     sessionLoads.delete(id)
     sessionAccess.delete(id)
+    failedRequests.delete(id)
+    failedBranchSelections.delete(id)
+    for (const [messageId, partial] of failedReplySaves) {
+      if (partial.sessionId === id) {
+        failedReplySaves.delete(messageId)
+      }
+    }
     clearDraft(id)
     set((state) => ({
       sessions: state.sessions.filter((session) => session.id !== id),
@@ -427,7 +491,7 @@ export const sendMessage = (targetSessionId: string | null) => {
   let sessionId = targetSessionId
   if (
     sessionId !== null &&
-    (deletingSessions.has(sessionId) || getStreamController(sessionId) || !getSession(sessionId))
+    (deletingSessions.has(sessionId) || getStreamController(sessionId) || failedRequests.has(sessionId) || !getSession(sessionId))
   ) {
     return false
   }
@@ -487,7 +551,7 @@ export const regenerateReply = (sessionId: string, messageId?: string) => {
     return
   }
   const session = getSession(sessionId)
-  if (!session || getStreamController(sessionId)) {
+  if (!session || getStreamController(sessionId) || failedRequests.has(sessionId)) {
     return
   }
   const path = getVisibleMessages(session)
@@ -503,7 +567,7 @@ export const regenerateReply = (sessionId: string, messageId?: string) => {
     ...appendBranch(s, question.id, [reply]),
     updatedAt: Date.now(),
   }))
-  void streamReply(sessionId, reply, { history, question })
+  void streamReply(sessionId, reply, { history, question, regenerate: true })
 }
 
 /** 编辑提问后新增同父版本，保留原文件 */
@@ -512,7 +576,7 @@ export const editMessage = (sessionId: string, messageId: string, content: strin
     return false
   }
   const session = getSession(sessionId)
-  if (!session || getStreamController(sessionId)) {
+  if (!session || getStreamController(sessionId) || failedRequests.has(sessionId)) {
     return false
   }
   const path = getVisibleMessages(session)
@@ -522,7 +586,6 @@ export const editMessage = (sessionId: string, messageId: string, content: strin
   if (previous?.role !== 'user' || (!text && previous.files.length === 0)) {
     return false
   }
-  // 后端契约：编辑会截断该消息之后的所有消息（PUT + rowid 截断），本地镜像截断
   const question: UserMessage = {
     id: createId(),
     role: 'user',
@@ -536,8 +599,6 @@ export const editMessage = (sessionId: string, messageId: string, content: strin
     ...appendBranch(s, truncated.at(-1)?.id ?? null, [question, reply]),
     updatedAt: Date.now(),
   }))
-  // 服务端同步：PUT 编辑 + 截断（编辑后旧行已在服务端被删除）
-  void db.editMessage(sessionId, previous.id, text)
   void streamReply(sessionId, reply, { history: truncated, question })
   return true
 }
@@ -549,7 +610,12 @@ export const selectMessageVersion = (sessionId: string, messageId: string) => {
   if (getStreamController(sessionId)) {
     return
   }
-  updateSession(sessionId, (session) => selectVersion(session, messageId))
+  const session = getSession(sessionId)
+  if (!session || failedRequests.has(sessionId) || selectVersion(session, messageId) === session) {
+    return
+  }
+  updateSession(sessionId, (current) => selectVersion(current, messageId))
+  void saveBranchSelection(sessionId, messageId).catch(() => {})
 }
 
 /** 继续最后一条未完成的回答 */
@@ -558,7 +624,7 @@ export const continueReply = (sessionId: string, messageId: string) => {
     return
   }
   const session = getSession(sessionId)
-  if (!session || getStreamController(sessionId)) {
+  if (!session || getStreamController(sessionId) || failedRequests.has(sessionId)) {
     return
   }
   const path = getVisibleMessages(session)
@@ -590,7 +656,7 @@ export const retryUpload = (sessionId: string, messageId: string) => {
     return
   }
   const session = getSession(sessionId)
-  if (!session || getStreamController(sessionId)) {
+  if (!session || getStreamController(sessionId) || failedRequests.has(sessionId)) {
     return
   }
   const path = getVisibleMessages(session)
@@ -609,7 +675,7 @@ export const retryUpload = (sessionId: string, messageId: string) => {
   void streamReply(sessionId, reply, { history: path.slice(0, index - 1), question })
 }
 
-type Request = { history: Message[]; question: UserMessage; prefix?: AssistantMessage }
+type Request = { history: Message[]; question: UserMessage; prefix?: AssistantMessage; regenerate?: boolean }
 
 /** 把上传得到的 serverId/url 写回会话里所有引用同一附件的消息 */
 const saveServerIds = (sessionId: string, updates: Map<string, { serverId: string; url: string }>) => {
@@ -687,17 +753,19 @@ const prepareFiles = async (sessionId: string, request: Request, signal: AbortSi
     history: request.history.map(resolve),
     question: resolve(request.question),
     prefix: request.prefix,
+    regenerate: request.regenerate,
   }
 }
 
 /**
  * 请求并消费流：先建会话（新对话）→ 补齐附件 serverId → 发请求；
- * 流式增量按动画帧刷新内存；后端 onEnd 自动持久化，前端无需写回。
+ * 后端先保存再发送完成帧；停止后的可见前缀另行保存。
  */
 const streamReply = async (sessionId: string, initial: AssistantMessage, request: Request) => {
   const controller = new AbortController()
   set((state) => ({ streaming: { ...state.streaming, [sessionId]: controller } }))
-  let reply = initial
+  const generationId = createId()
+  let reply = { ...initial, stopReason: undefined } as AssistantMessage
   let frame = 0
   const flush = () => {
     cancelAnimationFrame(frame)
@@ -707,6 +775,7 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
   streamFlushes.set(sessionId, flush)
 
   let serverIdAligned = false
+  let requestStarted = false
   let conversationId = sessionId
 
   try {
@@ -747,20 +816,43 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
     }
 
     try {
+      try {
+        await branchSaves.get(sessionId)
+        const failedSelection = failedBranchSelections.get(sessionId)
+        if (failedSelection) {
+          await saveBranchSelection(sessionId, failedSelection)
+        }
+      } catch (error) {
+        failedRequests.set(sessionId, { reply: initial, request })
+        updateSaveError(sessionId)
+        throw error
+      }
+      failedRequests.delete(sessionId)
+      updateSaveError(sessionId)
+      controller.signal.throwIfAborted()
+      const partial = failedReplySaves.get(reply.id)
+      if (request.prefix && partial) {
+        await savePartialReply(partial)
+      }
+      controller.signal.throwIfAborted()
       const prepared = await prepareFiles(sessionId, request, controller.signal)
-      const messages = toRequestMessages(
-        prepared.history,
-        prepared.question,
-        prepared.prefix
-      )
+      controller.signal.throwIfAborted()
+      const messages = toRequestMessages(prepared.history, prepared.question, prepared.prefix)
       const { thinking } = useSettings.getState()
+      const action = prepared.prefix ? 'continue' : prepared.regenerate ? 'generate' : 'messages'
       const events = streamMessage(
         sessionId,
         {
           messages,
           deep_think: initial.thinking ?? thinking ?? false,
+          parent_id: prepared.history.at(-1)?.id ?? null,
+          assistant_message_id: reply.id,
+          generation_id: generationId,
+          ...(prepared.prefix ? { message_id: reply.id, existing_content: getReplyText(prepared.prefix) } : {}),
+          ...(prepared.regenerate ? { message_id: prepared.question.id } : {}),
         },
-        controller.signal
+        controller.signal,
+        action
       )
       const blockIndexes = new Map<string, number>()
       const split = createThinkingSplitState()
@@ -792,21 +884,38 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
         }
       }
 
+      let wakePlayback: (() => void) | undefined
+      let waitingForEvent = false
+      const wake = () => wakePlayback?.()
+      const wait = (ms?: number) => new Promise<void>((resolve) => {
+        const timer = ms === undefined ? undefined : setTimeout(wake, ms)
+        wakePlayback = () => {
+          clearTimeout(timer)
+          wakePlayback = undefined
+          resolve()
+        }
+      })
       const play = async () => {
-        const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-        while (!streamFinished || queue.length > 0) {
+        while (!controller.signal.aborted && (!streamFinished || queue.length > 0)) {
           const event = queue.shift()
           if (!event) {
-            await sleep(15)
+            waitingForEvent = true
+            await wait()
+            waitingForEvent = false
             continue
           }
           if (typingDelay > 0 && (event.type === 'text-delta' || event.type === 'reasoning-delta')) {
-            for (const char of event.delta) {
+            const characters = [...event.delta]
+            for (let index = 0; index < characters.length; index++) {
               if (controller.signal.aborted) {
                 return
               }
-              processEvent({ type: event.type, id: event.id, delta: char })
-              await sleep(typingDelay)
+              if (document.visibilityState === 'hidden' || streamFailure) {
+                processEvent({ ...event, delta: characters.slice(index).join('') })
+                break
+              }
+              processEvent({ ...event, delta: characters[index] })
+              await wait(typingDelay)
             }
           } else {
             processEvent(event)
@@ -816,31 +925,48 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
 
       const read = async () => {
         try {
+          requestStarted = true
           for await (const event of events) {
             queue.push(event)
+            if (waitingForEvent) {
+              wake()
+            }
           }
         } catch (error) {
           streamFailure = error
         } finally {
           streamFinished = true
+          if (waitingForEvent || streamFailure) {
+            wake()
+          }
         }
       }
 
-      await Promise.all([read(), play()])
-
+      controller.signal.addEventListener('abort', wake)
+      document.addEventListener('visibilitychange', wake)
+      try {
+        await Promise.all([read(), play()])
+      } finally {
+        controller.signal.removeEventListener('abort', wake)
+        document.removeEventListener('visibilitychange', wake)
+        wake()
+      }
+      reply = flushReplySplit(reply, split, Date.now())
+      controller.signal.throwIfAborted()
       if (streamFailure) {
         throw streamFailure
       }
-      reply = settleReply(reply, 'done', Date.now())
+      reply = settleReply(reply, reply.stopReason === 'end_turn' ? 'done' : 'stopped', Date.now())
       // 乐观更新列表时间戳
       bumpSessionList(sessionId, { updatedAt: Date.now() })
       flush()
       void refreshSessions()
     } catch (error) {
       if (controller.signal.aborted) {
-        reply = settleReply(reply, 'stopped', Date.now())
+        reply = settleReply({ ...reply, stopReason: 'aborted' }, 'stopped', Date.now())
       } else if (error instanceof ApiError) {
-        reply = settleReply(reply, 'error', Date.now(), {
+        const interrupted = getReplyText(reply) && ['stream', 'network', 'interrupted'].includes(error.kind)
+        reply = settleReply({ ...reply, stopReason: 'interrupted' }, interrupted ? 'stopped' : 'error', Date.now(), {
           kind: error.kind,
           message: error.message,
           status: error.status,
@@ -854,13 +980,19 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
       }
       flush()
       void refreshSessions()
-      // 兜底保存：流中断/断开时把用户已看到的内容写回后端（幂等，服务端更完整版本优先）
-      // 仅在已对齐服务端消息 ID 且有已显示内容时调用；失败静默（后端 tee 分支仍会尝试保存）
       const partialText = getReplyText(reply)
-      if (partialText && sessionId === conversationId) {
-        void db
-          .saveReplyPartial(sessionId, reply.id, partialText, true)
-          .catch(() => {})
+      if (partialText && (serverIdAligned || (request.prefix && requestStarted)) && reply.status === 'stopped') {
+        const partial: PartialReplySave = {
+          sessionId, messageId: reply.id, content: partialText, generationId,
+          stopReason: controller.signal.aborted ? 'aborted' : 'interrupted',
+        }
+        failedReplySaves.set(reply.id, partial)
+        try {
+          await savePartialReply(partial)
+        } catch (saveError) {
+          updateSaveError(sessionId)
+          db.reportStorageError('save interrupted reply')(saveError)
+        }
       }
     }
   } finally {

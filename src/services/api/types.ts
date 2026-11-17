@@ -17,7 +17,7 @@ export type UIStreamEvent =
   | { type: 'reasoning-end'; id: string }
   | { type: 'data-image'; id: string; data: { url: string; model?: string } }
   | { type: 'error'; errorText: string }
-  | { type: 'finish'; messageMetadata?: Record<string, unknown> }
+  | { type: 'finish'; finishReason?: string; messageMetadata?: Record<string, unknown> }
 
 /** 文件上传响应（/api/files/upload，沿用现有契约） */
 export type UploadedFile = {
@@ -58,6 +58,8 @@ export type MessageRow = {
     image_prompt?: string
     tokens?: { input?: number; output?: number }
     stopped?: boolean
+    stopReason?: 'end_turn' | 'max_tokens' | 'aborted' | 'interrupted'
+    branch?: { parentId: string | null; selectedChildId?: string; selectedRoot?: boolean }
   } | null
 }
 

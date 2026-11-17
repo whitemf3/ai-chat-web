@@ -102,14 +102,17 @@ export class ServerSentEventDecoder {
  * 逐个产出字节流中的 SSE 事件；流读完即结束。
  * 中止或调用方提前退出时取消读取以释放连接，不依赖底层网络把中止传到响应体。
  */
+export class StreamIdleTimeoutError extends Error {}
+
 export async function* readServerSentEvents(
   stream: ReadableStream<Uint8Array>,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  idleTimeoutMs = 120_000
 ): AsyncGenerator<ServerSentEvent> {
   const reader = stream.getReader()
   // 停止发生在流建立前：直接断开连接（后端据此感知中断并保存半截内容）
   if (signal?.aborted) {
-    await reader.cancel(signal.reason).catch(() => {})
+    void reader.cancel(signal.reason).catch(() => {})
     reader.releaseLock()
     return
   }
@@ -121,9 +124,19 @@ export async function* readServerSentEvents(
   const textDecoder = new TextDecoder()
   const decoder = new ServerSentEventDecoder()
   let finished = false
+  let timedOut = false
+  let timer: ReturnType<typeof setTimeout> | undefined
   try {
     for (;;) {
+      timer = setTimeout(() => {
+        timedOut = true
+        void reader.cancel().catch(() => {})
+      }, idleTimeoutMs)
       const { done, value } = await reader.read()
+      clearTimeout(timer)
+      if (timedOut) {
+        throw new StreamIdleTimeoutError()
+      }
       if (done) {
         finished = true
         yield* decoder.push(textDecoder.decode())
@@ -133,6 +146,7 @@ export async function* readServerSentEvents(
       yield* decoder.push(textDecoder.decode(value, { stream: true }))
     }
   } finally {
+    clearTimeout(timer)
     signal?.removeEventListener('abort', onAbort)
     if (!finished) {
       reader.cancel().catch(() => {})

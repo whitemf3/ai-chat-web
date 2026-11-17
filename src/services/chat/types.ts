@@ -83,7 +83,7 @@ export type AssistantMessage = MessageBranch & {
   blocks: ReplyBlock[]
   /** 路由信息（后端 start chunk messageMetadata.route） */
   route?: { intent?: string; reason?: string; confidence?: number }
-  stopReason?: 'end_turn' | 'max_tokens' | 'aborted'
+  stopReason?: 'end_turn' | 'max_tokens' | 'aborted' | 'interrupted'
   /** 最近一次请求的用量，续写后更新 */
   usage?: { input: number; output: number }
   error?: {

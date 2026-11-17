@@ -104,7 +104,13 @@ export const AssistantMessage = memo(function AssistantMessage({
           ))}
         </div>
       ) : null}
-      {message.status === 'error' && message.error ? (
+      {message.status === 'stopped' && !message.error && message.stopReason !== 'aborted' ? (
+        <div className={styles.notice}>
+          <IconWarningOutline16 />
+          <span>{t(message.stopReason === 'max_tokens' ? 'replyLengthLimit' : 'replyInterrupted')}</span>
+        </div>
+      ) : null}
+      {message.error ? (
         <div className={styles.notice}>
           <IconWarningOutline16 />
           <span>{message.error.localMessage ? t(message.error.localMessage.key) : message.error.message}</span>
