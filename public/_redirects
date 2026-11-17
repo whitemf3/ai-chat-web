@@ -1,0 +1,8 @@
+# Cloudflare Pages 重定向规则（SPA 路由）
+# /login 别名 → login.html
+/login           /login.html      200
+/login/           /login.html     200
+# /share/:code → share.html（前端从路径解析 code）
+/share/*         /share.html     200
+# 其余路径 → index.html（SPA fallback）
+/*               /index.html      200

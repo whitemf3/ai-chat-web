@@ -1,29 +1,49 @@
 {
   "name": "ai-chat-web",
-  "version": "1.0.0",
+  "version": "2.0.0",
+  "description": "基于 DeepSeek chat-demo 源码改造的 AI 聊天前端（Cloudflare Workers 后端）。",
+  "license": "MIT",
   "private": true,
+  "type": "module",
   "scripts": {
-    "build": "nuxt build",
-    "dev": "nuxt dev",
-    "generate": "nuxt generate",
-    "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "dev": "rspack serve -c rspack.config.ts",
+    "build": "rimraf dist && cross-env NODE_ENV=production rspack build -c rspack.config.ts",
+    "type": "tsc -p tsconfig.json",
+    "lint": "oxlint src rspack.config.ts",
+    "format": "oxfmt --write ."
   },
   "dependencies": {
-    "@ai-sdk/vue": "^4.0.148",
-    "@pinia/nuxt": "^0.5.0",
-    "ai": "^7.0.148",
-    "highlight.js": "^11.9.0",
-    "jszip": "^3.10.0",
-    "markdown-it": "^14.0.0",
-    "pdfjs-dist": "^4.0.0",
-    "pinia": "^2.1.0",
-    "xlsx": "^0.18.0"
+    "@types/katex": "^0.16.5",
+    "@types/mdast": "~4.0.3",
+    "@types/prismjs": "^1.26.1",
+    "@types/react": "~18.3.1",
+    "@types/react-dom": "~18.3.0",
+    "clsx": "2.1.1",
+    "fflate": "0.8.3",
+    "idb": "8.0.3",
+    "katex": "0.16.22",
+    "mdast-util-find-and-replace": "3.0.2",
+    "mdast-util-from-markdown": "2.0.3",
+    "mdast-util-gfm": "3.1.0",
+    "mdast-util-math": "3.0.0",
+    "mermaid": "11.10.1",
+    "micromark-extension-gfm": "3.0.0",
+    "micromark-extension-llm-math": "3.1.0",
+    "prismjs": "1.30.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "zustand": "4.4.7"
   },
   "devDependencies": {
-    "nuxt": "^3.10.0",
-    "typescript": "^5.0.0",
-    "vue": "^3.4.0",
-    "vue-router": "^4.2.0"
+    "@rspack/cli": "2.0.2",
+    "@rspack/core": "2.0.2",
+    "@rspack/dev-server": "2.0.1",
+    "@swc/helpers": "0.5.23",
+    "@types/node": "~20.9.2",
+    "cross-env": "^10.1.0",
+    "oxfmt": "0.48.0",
+    "oxlint": "1.63.0",
+    "rimraf": "6.0.1",
+    "typescript": "7.0.2"
   }
 }

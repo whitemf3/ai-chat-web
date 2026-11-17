@@ -1,0 +1,113 @@
+/* 分享公开页（对齐主聊天页 DeepSeek 版式：消息流宽度、气泡布局、配色 token） */
+.sharePage {
+  min-height: 100vh;
+  background: var(--dsw-alias-bg-base);
+  padding: 48px 16px 64px;
+  box-sizing: border-box;
+}
+
+.shareCard {
+  --message-list-max-width: 780px;
+  width: min(var(--message-list-max-width), calc(100% - 32px));
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  box-sizing: border-box;
+}
+
+/* 会话头：标题 + 元信息（与主页面标题栏观感一致） */
+.shareHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1);
+}
+
+.shareTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 28px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.shareMeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.shareMetaDot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--dsw-alias-label-dimmed);
+}
+
+/* 消息流 */
+.shareMessages {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* 用户消息：右侧胶囊气泡（对齐主页面 UserMessage 观感） */
+.shareUser {
+  align-self: flex-end;
+  max-width: 78%;
+  padding: 12px 18px;
+  border-radius: 16px 16px 4px 16px;
+  background: var(--dsw-alias-interactive-bg-hover-accent);
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  line-height: 24px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* 助手回复：左侧通栏 markdown（对齐主页面 AssistantMessage 观感） */
+.shareAssistant {
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  line-height: 24px;
+  padding-right: 48px;
+}
+
+.shareAssistant > :global(.ds-assistant-message-main-content) {
+  font-size: 15px;
+  line-height: 28px;
+}
+
+/* 生成图 */
+.shareImages {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.shareImage {
+  max-width: min(420px, 100%);
+  border-radius: 12px;
+  border: 1px solid var(--dsw-alias-border-l1);
+}
+
+/* 加载与错误态 */
+.shareLoading {
+  text-align: center;
+  padding: 96px 0;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 14px;
+}
+
+.shareError {
+  text-align: center;
+  padding: 96px 0;
+  color: var(--dsw-alias-state-error-primary);
+  font-size: 14px;
+}
