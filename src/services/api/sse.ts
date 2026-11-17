@@ -107,6 +107,12 @@ export async function* readServerSentEvents(
   signal?: AbortSignal
 ): AsyncGenerator<ServerSentEvent> {
   const reader = stream.getReader()
+  // 停止发生在流建立前：直接断开连接（后端据此感知中断并保存半截内容）
+  if (signal?.aborted) {
+    await reader.cancel(signal.reason).catch(() => {})
+    reader.releaseLock()
+    return
+  }
   const onAbort = () => {
     reader.cancel(signal?.reason).catch(() => {})
   }

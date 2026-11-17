@@ -164,7 +164,9 @@ export async function* streamMessage(
         Accept: 'text/event-stream',
       },
       body: JSON.stringify(body),
-      signal,
+      // 不给 fetch 传 abort：停止太快时请求会被取消于发出前，后端完全收不到
+      // 本条消息（用户消息与回复都不会保存）。停止改由读取循环 cancel 流实现，
+      // 连接断开后端仍能收到请求并保存半截内容。
     }
   )
 
