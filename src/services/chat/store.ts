@@ -147,13 +147,15 @@ const updateReply = (sessionId: string, reply: AssistantMessage) =>
     ),
   }))
 
-/** start 事件把本地临时 id 对齐为服务端 messageId：会话内消息 id 必须同步改，否则后续增量无法命中 */
+/** start 事件把本地临时 id 对齐为服务端 messageId：消息 id 与所有 selectedChildId/rootMessageId 引用必须同步改，否则消息链断裂、回复从可见路径消失 */
 const renameMessage = (sessionId: string, oldId: string, newId: string) =>
   updateSession(sessionId, (session) => ({
     ...session,
-    messages: session.messages.map((message) =>
-      message.id === oldId ? { ...message, id: newId } : message
-    ),
+    rootMessageId: session.rootMessageId === oldId ? newId : session.rootMessageId,
+    messages: session.messages.map((message) => ({
+      ...(message.id === oldId ? { ...message, id: newId } : message),
+      ...(message.selectedChildId === oldId ? { selectedChildId: newId } : {}),
+    })),
   }))
 
 /** 本地临时会话 ID → 服务端 conversation ID 迁移：消息 parentId 保持不变，仅替换会话键 */
