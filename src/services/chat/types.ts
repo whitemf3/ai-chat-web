@@ -17,6 +17,8 @@ export type FileAttachment = {
   mimeType: string
   /** 本地预览（图片）；发送后以 serverId 换取后端 url */
   url?: string | null
+  /** 文本类附件的内容（发送时随附件交给模型阅读，截断到上限） */
+  textContent?: string
 }
 
 /** 本地消息的分支关系；字段缺省时按线性消息列表处理。 */

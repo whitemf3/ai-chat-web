@@ -203,6 +203,8 @@ const toUserParam = ({ content, files }: UserMessage): unknown => {
       type: file.isImage ? 'image' : 'document',
       url: file.url || file.serverId,
       name: file.name,
+      // 文本类附件带上内容，后端注入 [文档内容: ...] 供模型阅读
+      ...(file.textContent ? { content: file.textContent } : {}),
     }))
   return {
     role: 'user' as const,

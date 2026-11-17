@@ -2,6 +2,7 @@ import clsx from 'clsx'
 import { useEffect, useState } from 'react'
 import { useTranslate } from '../../i18n/index.js'
 import { useUploads } from '../../services/attachments.js'
+import { resolveApiUrl } from '../../services/api/client.js'
 import { loadFile } from '../../services/chat/db.js'
 import type { FileAttachment } from '../../services/chat/types.js'
 import { IconPhotoErrorFill20, IconRefreshOutline16 } from '../base/icons.js'
@@ -159,6 +160,7 @@ export const MessageFile = ({
       error={errorText}
       onRetry={retry ?? undefined}
       onOpen={url && !upload ? () => window.open(url, '_blank', 'noreferrer') : undefined}
+      onDownload={file.url ? () => window.open(resolveApiUrl(file.url!), '_blank', 'noreferrer') : undefined}
     />
   )
 }

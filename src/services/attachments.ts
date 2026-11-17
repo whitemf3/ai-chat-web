@@ -21,6 +21,18 @@ export const getFileExt = (name: string) => {
 
 export const isAcceptedExt = (name: string) => ACCEPTED_EXTS.includes(getFileExt(name))
 
+/** 纯文本类扩展名：上传时读取内容随消息发送，供模型阅读 */
+const TEXT_EXTS = new Set([
+  'txt', 'md', 'markdown', 'csv', 'tsv', 'json', 'log', 'xml', 'html', 'htm',
+  'yml', 'yaml', 'ini', 'toml', 'conf', 'env', 'sql',
+  'py', 'js', 'mjs', 'cjs', 'ts', 'tsx', 'jsx', 'vue', 'svelte',
+  'java', 'c', 'h', 'cpp', 'hpp', 'cs', 'go', 'rs', 'rb', 'php', 'swift', 'kt',
+  'sh', 'bat', 'ps1', 'css', 'scss', 'less', 'gitignore', 'dockerfile',
+])
+
+/** 是否为可读取文本内容的文件（按扩展名） */
+export const isTextExt = (name: string) => TEXT_EXTS.has(getFileExt(name))
+
 /** 添加前校验：格式 → 大小 → 数量，任一不满足即整批不添加 */
 export const validateFiles = (files: File[], currentCount: number): TranslationMessage | null => {
   if (files.some((file) => !isAcceptedExt(file.name))) {

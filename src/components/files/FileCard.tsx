@@ -2,7 +2,7 @@ import clsx from 'clsx'
 import type { ReactNode } from 'react'
 import { useTranslate } from '../../i18n/index.js'
 import { formatSize, getExtension } from '../../services/attachments.js'
-import { IconCloseFill14, IconRefreshOutline16 } from '../base/icons.js'
+import { IconCloseFill14, IconDownloadOutline16, IconRefreshOutline16 } from '../base/icons.js'
 import { FileIcon } from './FileIcon.js'
 import styles from './FileCard.module.css'
 
@@ -19,6 +19,7 @@ export const FileCard = ({
   onRetry,
   onRemove,
   onOpen,
+  onDownload,
 }: {
   name: string
   size: number
@@ -27,6 +28,8 @@ export const FileCard = ({
   onRetry?: () => void
   onRemove?: () => void
   onOpen?: () => void
+  /** 服务端原件可下载时提供（后端以 attachment 头响应） */
+  onDownload?: () => void
 }) => {
   const t = useTranslate()
   const ext = getExtension(name)
@@ -65,6 +68,20 @@ export const FileCard = ({
         <div className={styles.caption}>{name}</div>
         <div className={styles.subCaption}>{description}</div>
       </div>
+      {onDownload && status === 'done' ? (
+        <button
+          type="button"
+          className={styles.remove}
+          aria-label="下载"
+          title="下载"
+          onClick={(event) => {
+            event.stopPropagation()
+            onDownload()
+          }}
+        >
+          <IconDownloadOutline16 />
+        </button>
+      ) : null}
       {onRemove ? (
         <button
           type="button"

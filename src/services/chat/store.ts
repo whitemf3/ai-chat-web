@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { createId } from '../../utils/id.js'
 import { ApiError, streamMessage } from '../api/client.js'
+import type { UIStreamEvent } from '../api/types.js'
+import { getTypingDelay } from '../config.js'
 import * as db from './db.js'
 import {
   clearDraft,
@@ -455,7 +457,7 @@ export const sendMessage = (targetSessionId: string | null) => {
     id: createId(),
     role: 'user',
     content: text,
-    files: files.map(({ id, serverId, name, size, isImage, mimeType, url }) => ({
+    files: files.map(({ id, serverId, name, size, isImage, mimeType, url, textContent }) => ({
       id,
       serverId,
       name,
@@ -463,6 +465,7 @@ export const sendMessage = (targetSessionId: string | null) => {
       isImage,
       mimeType,
       url,
+      ...(textContent ? { textContent } : {}),
     })),
     createdAt: now,
   }
@@ -760,8 +763,14 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
       )
       const blockIndexes = new Map<string, number>()
       const split = createThinkingSplitState()
-      for await (const event of events) {
-        // start chunk：对齐服务端 messageId（D1 主键）
+
+      // 打字机效果：delta 事件进入队列，按后台「AI 打字效果延迟」逐字应用；延迟为 0 时直接透传
+      const typingDelay = await getTypingDelay()
+      const queue: UIStreamEvent[] = []
+      let streamFinished = false
+      let streamFailure: unknown = null
+
+      const processEvent = (event: UIStreamEvent) => {
         if (event.type === 'start' && event.messageId && !serverIdAligned) {
           serverIdAligned = true
           const previousId = reply.id
@@ -771,11 +780,49 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
         reply = applyEvent(reply, event, Date.now(), blockIndexes, split)
         if (document.visibilityState === 'hidden') {
           flush()
-        } else {
-          if (frame === 0) {
-            frame = requestAnimationFrame(flush)
+        } else if (frame === 0) {
+          frame = requestAnimationFrame(flush)
+        }
+      }
+
+      const play = async () => {
+        const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+        while (!streamFinished || queue.length > 0) {
+          const event = queue.shift()
+          if (!event) {
+            await sleep(15)
+            continue
+          }
+          if (typingDelay > 0 && (event.type === 'text-delta' || event.type === 'reasoning-delta')) {
+            for (const char of event.delta) {
+              if (controller.signal.aborted) {
+                return
+              }
+              processEvent({ type: event.type, id: event.id, delta: char })
+              await sleep(typingDelay)
+            }
+          } else {
+            processEvent(event)
           }
         }
+      }
+
+      const read = async () => {
+        try {
+          for await (const event of events) {
+            queue.push(event)
+          }
+        } catch (error) {
+          streamFailure = error
+        } finally {
+          streamFinished = true
+        }
+      }
+
+      await Promise.all([read(), play()])
+
+      if (streamFailure) {
+        throw streamFailure
       }
       reply = settleReply(reply, 'done', Date.now())
       // 乐观更新列表时间戳

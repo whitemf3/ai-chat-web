@@ -7,6 +7,7 @@ import {
   resolveMimeType,
   uploadAttachment,
   validateFiles,
+  isTextExt,
   type UploadTask,
 } from '../attachments.js'
 import type { FileAttachment } from './types.js'
@@ -17,6 +18,8 @@ export type DraftAttachment = {
   file: File
   isImage: boolean
   previewUrl: string | null
+  /** 文本类附件的内容（选择文件后异步读取，发送时随附件交给模型） */
+  textContent?: string
 }
 
 type Draft = { text: string; attachments: DraftAttachment[] }
@@ -78,6 +81,18 @@ export const addDraftFiles = (
     }
   })
   updateDraft(sessionId, (draft) => ({ ...draft, attachments: [...draft.attachments, ...added] }))
+  // 文本类附件读取内容（上限 60k 字符），发送时随附件交给模型阅读
+  for (const attachment of added) {
+    if (!attachment.isImage && isTextExt(attachment.file.name)) {
+      void attachment.file
+        .slice(0, 60_000)
+        .text()
+        .then((content) => {
+          attachment.textContent = content
+        })
+        .catch(() => {})
+    }
+  }
   added.forEach((attachment) => upload(attachment))
   return null
 }
@@ -113,6 +128,7 @@ export const prepareDraftMessage = (draft: Draft, tasks: Record<string, UploadTa
       isImage: attachment.isImage,
       mimeType: resolveMimeType(attachment.file),
       blob: attachment.file,
+      ...(attachment.textContent ? { textContent: attachment.textContent } : {}),
     })
   }
   return { text, files }

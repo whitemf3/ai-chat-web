@@ -1,5 +1,5 @@
 import { useTranslate } from '../../i18n/index.js'
-import { memo } from 'react'
+import { memo, useState } from 'react'
 import { IconRefreshOutline16, IconWarningOutline16 } from '../base/icons.js'
 import { canContinueReply, getReplyText } from '../../services/chat/reply.js'
 import { continueReply, regenerateReply } from '../../services/chat/store.js'
@@ -42,6 +42,7 @@ export const AssistantMessage = memo(function AssistantMessage({
   const copyText = responseText
   const waiting = streaming && view.steps.length === 0 && !view.answer && !message.thinking
   const images = message.blocks.filter((block) => block.type === 'image')
+  const [zoomUrl, setZoomUrl] = useState<string | null>(null)
   return (
     <div className={styles.message}>
       <ReplyArea
@@ -70,9 +71,30 @@ export const AssistantMessage = memo(function AssistantMessage({
                 alt={t('generatedImageAlt')}
                 className={styles.generatedImage}
                 loading="lazy"
+                onClick={() => setZoomUrl(block.image.url)}
               />
             ) : null
           )}
+        </div>
+      ) : null}
+      {zoomUrl ? (
+        <div
+          className={styles.lightbox}
+          role="dialog"
+          aria-label={t('generatedImageAlt')}
+          onClick={() => setZoomUrl(null)}
+        >
+          <img
+            className={styles.lightboxImage}
+            src={resolveApiUrl(zoomUrl)}
+            alt={t('generatedImageAlt')}
+            onClick={(event) => event.stopPropagation()}
+          />
+          <div className={styles.lightboxActions} onClick={(event) => event.stopPropagation()}>
+            <a className={styles.lightboxLink} href={`${resolveApiUrl(zoomUrl)}?download=1`}>
+              下载图片
+            </a>
+          </div>
         </div>
       ) : null}
       {waiting ? (
