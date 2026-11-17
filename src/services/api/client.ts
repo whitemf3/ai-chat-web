@@ -12,6 +12,10 @@ import type { ApiErrorBody, UIStreamEvent } from './types.js'
 /** 构建期注入的后端 API 地址（rspack DefinePlugin __API_ORIGIN__） */
 export const API_ORIGIN = __API_ORIGIN__
 
+/** 后端返回的相对资源地址（生成图/文件）拼成完整 URL；未注入 API 地址时保持相对路径 */
+export const resolveApiUrl = (url: string): string =>
+  url.startsWith('/') && API_ORIGIN ? `${API_ORIGIN}${url}` : url
+
 const TOKEN_KEY = 'ai-chat:token'
 
 export const getToken = (): string | null => {

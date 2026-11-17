@@ -1,9 +1,9 @@
 import { useTranslate } from '../../i18n/index.js'
-import clsx from 'clsx'
 import { memo } from 'react'
 import { IconRefreshOutline16, IconWarningOutline16 } from '../base/icons.js'
 import { canContinueReply, getReplyText } from '../../services/chat/reply.js'
 import { continueReply, regenerateReply } from '../../services/chat/store.js'
+import { resolveApiUrl } from '../../services/api/client.js'
 import type { AssistantMessage as AssistantMessageType } from '../../services/chat/types.js'
 import { IconButton } from '../base/IconButton.js'
 import { Button } from '../base/Button.js'
@@ -66,7 +66,7 @@ export const AssistantMessage = memo(function AssistantMessage({
             block.type === 'image' ? (
               <img
                 key={`${block.image.url}-${index}`}
-                src={block.image.url}
+                src={resolveApiUrl(block.image.url)}
                 alt={t('generatedImageAlt')}
                 className={styles.generatedImage}
                 loading="lazy"
@@ -91,7 +91,7 @@ export const AssistantMessage = memo(function AssistantMessage({
       {streaming ? null : (
         <div className={styles.bottom}>
           <BranchSwitcher versions={versions} disabled={busy} onSelect={onSelectVersion} />
-          <div className={clsx(styles.actions, isLast && styles.alwaysShow)}>
+          <div className={styles.actions}>
             {copyText ? <CopyButton text={copyText} /> : null}
             <IconButton
               icon={<IconRefreshOutline16 />}

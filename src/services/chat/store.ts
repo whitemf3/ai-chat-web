@@ -17,6 +17,7 @@ import {
   settleReply,
   toRequestMessages,
 } from './reply.js'
+import { createThinkingSplitState } from './thinkingSplit.js'
 import {
   toSessionSummary,
   type AssistantMessage,
@@ -143,6 +144,15 @@ const updateReply = (sessionId: string, reply: AssistantMessage) =>
       message.id === reply.id
         ? { ...reply, parentId: message.parentId, selectedChildId: message.selectedChildId }
         : message
+    ),
+  }))
+
+/** start 事件把本地临时 id 对齐为服务端 messageId：会话内消息 id 必须同步改，否则后续增量无法命中 */
+const renameMessage = (sessionId: string, oldId: string, newId: string) =>
+  updateSession(sessionId, (session) => ({
+    ...session,
+    messages: session.messages.map((message) =>
+      message.id === oldId ? { ...message, id: newId } : message
     ),
   }))
 
@@ -747,13 +757,16 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
         controller.signal
       )
       const blockIndexes = new Map<string, number>()
+      const split = createThinkingSplitState()
       for await (const event of events) {
         // start chunk：对齐服务端 messageId（D1 主键）
         if (event.type === 'start' && event.messageId && !serverIdAligned) {
           serverIdAligned = true
+          const previousId = reply.id
           reply = { ...reply, id: event.messageId }
+          renameMessage(sessionId, previousId, event.messageId)
         }
-        reply = applyEvent(reply, event, Date.now(), blockIndexes)
+        reply = applyEvent(reply, event, Date.now(), blockIndexes, split)
         if (document.visibilityState === 'hidden') {
           flush()
         } else {

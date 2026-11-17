@@ -1,7 +1,7 @@
 {
   "name": "ai-chat-web",
   "installCommand": "npm install",
-  "buildCommand": "npm run build",
+  "buildCommand": "API_ORIGIN=https://ai.whitee.cn npm run build",
   "outputDirectory": "./dist",
   "nodeVersion": "22.11.0",
   "rewrites": [

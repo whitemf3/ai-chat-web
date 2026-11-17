@@ -1,5 +1,11 @@
 import type { UIStreamEvent } from '../api/types.js'
 import type { AssistantMessage, Message, ReplyBlock, ReplyStatus, UserMessage } from './types.js'
+import {
+  flushThinkingSplit,
+  pushThinkingDelta,
+  type SplitSegment,
+  type ThinkingSplitState,
+} from './thinkingSplit.js'
 
 const updateBlock = (
   reply: AssistantMessage,
@@ -15,6 +21,37 @@ const updateBlock = (
   return { ...reply, blocks }
 }
 
+/** 把拆分后的片段写入 blocks：text 追加到指定文本块，thinking 追加/新建思考块 */
+const appendSegments = (
+  reply: AssistantMessage,
+  textIndex: number,
+  segments: SplitSegment[],
+  now: number
+): AssistantMessage => {
+  let result = reply
+  for (const seg of segments) {
+    if (seg.kind === 'text') {
+      result = updateBlock(result, textIndex, (block) =>
+        block.type === 'text' ? { ...block, text: block.text + seg.value } : block
+      )
+      continue
+    }
+    const lastIndex = result.blocks.length - 1
+    const last = result.blocks[lastIndex]
+    if (last && last.type === 'thinking' && last.endedAt === undefined) {
+      result = updateBlock(result, lastIndex, (block) =>
+        block.type === 'thinking' ? { ...block, thinking: block.thinking + seg.value } : block
+      )
+    } else {
+      result = {
+        ...result,
+        blocks: [...result.blocks, { type: 'thinking', thinking: seg.value, startedAt: now }],
+      }
+    }
+  }
+  return result
+}
+
 /**
  * 把一个 UIMessageStream 事件合并进回复。
  * - text/reasoning 的 start/delta/end 维护独立块；同一请求的临时索引映射处理增量；
@@ -26,7 +63,8 @@ export const applyEvent = (
   reply: AssistantMessage,
   event: UIStreamEvent,
   now: number,
-  blockIndexes: Map<string, number>
+  blockIndexes: Map<string, number>,
+  split?: ThinkingSplitState
 ): AssistantMessage => {
   const next: AssistantMessage =
     reply.status === 'streaming' ? reply : { ...reply, status: 'streaming' }
@@ -49,9 +87,12 @@ export const applyEvent = (
       if (index === undefined) {
         return next
       }
-      return updateBlock(next, index, (block) =>
-        block.type === 'text' ? { ...block, text: block.text + event.delta } : block
-      )
+      if (!split) {
+        return updateBlock(next, index, (block) =>
+          block.type === 'text' ? { ...block, text: block.text + event.delta } : block
+        )
+      }
+      return appendSegments(next, index, pushThinkingDelta(split, event.delta), now)
     }
     case 'reasoning-start': {
       blockIndexes.delete(event.id)
@@ -75,7 +116,10 @@ export const applyEvent = (
         return next
       }
       blockIndexes.delete(event.id)
-      return updateBlock(next, index, (block) =>
+      const flushed = split
+        ? appendSegments(next, index, flushThinkingSplit(split), now)
+        : next
+      return updateBlock(flushed, index, (block) =>
         block.type === 'thinking' && block.startedAt !== undefined && block.endedAt === undefined
           ? { ...block, endedAt: now }
           : block

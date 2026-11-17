@@ -15,6 +15,7 @@ import { getJson, request } from '../api/client.js'
 import type { MessageRow, UploadedFile } from '../api/types.js'
 import { toSessionSummary, type Message, type Session, type SessionSummary } from './types.js'
 import { applyEvent, getReplyText, settleReply } from './reply.js'
+import { splitThinkingTags } from './thinkingSplit.js'
 import { createId } from '../../utils/id.js'
 
 /** IndexedDB 存储结构版本（仅本地附件原件缓存） */
@@ -119,7 +120,14 @@ const rowToMessage = (row: MessageRow): Message => {
   > = []
   const text = row.content || ''
   if (text) {
-    blocks.push({ type: 'text', text })
+    // DeepSeek R1 类模型把思考内容以  标签混在正文里，历史加载时同样拆分
+    for (const seg of splitThinkingTags(text)) {
+      if (seg.kind === 'text') {
+        blocks.push({ type: 'text', text: seg.value })
+      } else {
+        blocks.push({ type: 'thinking', thinking: seg.value })
+      }
+    }
   }
   for (const img of generatedImages) {
     blocks.push({ type: 'image', image: { url: img.url, model: img.model } })

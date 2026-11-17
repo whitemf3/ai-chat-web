@@ -11,10 +11,9 @@ const { version } = JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url), 'utf8')
 ) as { version: string }
 
-// 后端 API 地址：环境变量 API_ORIGIN（生产构建时可用其覆盖完整域名）。
-// 生产构建默认指向线上 API（EdgeOne 纯静态托管不做 /api 反向代理）；
-// 本地 dev 留空 = 走同源相对路径，由 devServer proxy 转发到 wrangler dev。
-const apiOrigin = process.env.API_ORIGIN ?? (dev ? '' : 'https://ai.whitee.cn')
+// 后端 API 地址：环境变量 API_ORIGIN（构建时注入完整域名，如 edgeone.json / Pages 配置）。
+// 未注入时留空 = 前端走同源相对路径（本地 dev 由 devServer proxy 转发到 wrangler dev）。
+const apiOrigin = process.env.API_ORIGIN ?? ''
 
 const cssLoader = {
   loader: 'builtin:lightningcss-loader',

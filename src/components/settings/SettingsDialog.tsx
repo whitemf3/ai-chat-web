@@ -63,10 +63,8 @@ const sections: { value: SettingsSection | 'account'; label: string; icon: React
 ]
 
 const SettingsContent = () => {
-  // 打开时按调用方指定的分组选中，之后在弹窗内切换
-  const [section, setSection] = useState<SettingsSection | 'account'>(() =>
-    useSettingsDialog.getState().section === 'general' ? 'general' : 'account'
-  )
+  // 打开设置默认显示「账户」tab（今日额度 + 退出登录）
+  const [section, setSection] = useState<SettingsSection | 'account'>('account')
   return (
     <Modal title="设置" closable className={styles.dialog} mainClassName={styles.dialogMain} onClose={closeSettings}>
       <div role="tablist" className={styles.navigation}>
