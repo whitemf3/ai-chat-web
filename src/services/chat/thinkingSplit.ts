@@ -40,11 +40,8 @@ export const pushThinkingDelta = (state: ThinkingSplitState, delta: string): Spl
         continue
       }
       const keep = safePrefixLength(s, CLOSE)
-      if (keep < s.length) {
-        emit('thinking', s.slice(0, keep))
-        s = s.slice(keep)
-      }
-      state.pending = s
+      emit('thinking', s.slice(0, keep))
+      state.pending = s.slice(keep)
       return segments
     }
     const open = s.indexOf(OPEN)
@@ -55,11 +52,8 @@ export const pushThinkingDelta = (state: ThinkingSplitState, delta: string): Spl
       continue
     }
     const keep = safePrefixLength(s, OPEN)
-    if (keep < s.length) {
-      emit('text', s.slice(0, keep))
-      s = s.slice(keep)
-    }
-    state.pending = s
+    emit('text', s.slice(0, keep))
+    state.pending = s.slice(keep)
     return segments
   }
 }
