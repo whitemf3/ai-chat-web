@@ -474,6 +474,12 @@ const removeSessionData = async (id: string): Promise<boolean> => {
 
 export const stopReply = (sessionId: string) => getStreamController(sessionId)?.abort()
 
+/** 批量删除会话；逐个复用单删逻辑（后端级联删除消息与 R2 附件）。全部成功才返回 true */
+export const removeSessions = async (ids: string[]): Promise<boolean> => {
+  const results = await Promise.all(ids.map((id) => removeSession(id)))
+  return results.every(Boolean)
+}
+
 /**
  * 提交指定会话的最新草稿；null 表示新建会话。
  * 发送时后端隐式持有会话（首次发送前由前端先建 conversation）。

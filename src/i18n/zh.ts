@@ -184,4 +184,9 @@ export const zh = {
   shareSession: '分享',
   shareLinkCopied: '公开链接已复制到剪贴板，有效期 24 小时',
   shareFailed: '分享失败，请重试',
+  batchManage: '批量管理',
+  selectAll: '全选',
+  done: '完成',
+  batchDeleteConfirmTitle: '永久删除所选对话',
+  batchDeleteConfirmDescription: '删除后，所选 {count} 个对话及其中上传的文件将不可恢复。确认删除吗？',
 } as const

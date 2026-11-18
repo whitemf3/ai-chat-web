@@ -34,6 +34,13 @@
   color: var(--dsw-alias-brand-primary);
 }
 
+.topActions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 4px;
+}
+
 .newChat {
   position: relative;
   display: flex;
@@ -77,6 +84,63 @@
 .newChatIcon {
   display: flex;
   margin-right: 6px;
+}
+
+.manageBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  height: 40px;
+  flex-shrink: 0;
+  padding: 0 2px;
+}
+
+.selectAll {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+  user-select: none;
+
+  &:hover {
+    background-color: var(--dsw-specific-sidebar-nav-item-hover);
+  }
+}
+
+.manageActions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 6px;
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--dsw-alias-border-l2);
+  border-radius: 5px;
+  background-color: var(--dsw-specific-input-major);
+  color: var(--dsw-alias-brand-primary-invert);
+}
+
+.checkboxChecked {
+  border-color: var(--dsw-alias-brand-primary);
+  background-color: var(--dsw-alias-brand-primary);
 }
 
 .listWrap {

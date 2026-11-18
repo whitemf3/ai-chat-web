@@ -45,6 +45,31 @@
   margin-left: 4px;
 }
 
+/* 菜单展开时保持触发按钮可见，避免行失去 hover 后锚点盒子塌缩导致浮层跳到左上角 */
+.actionOpen {
+  display: flex;
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  margin-right: 8px;
+  border: 1.5px solid var(--dsw-alias-border-l2);
+  border-radius: 5px;
+  background-color: var(--dsw-specific-input-major);
+  color: var(--dsw-alias-brand-primary-invert);
+}
+
+.checkboxChecked {
+  border-color: var(--dsw-alias-brand-primary);
+  background-color: var(--dsw-alias-brand-primary);
+}
+
 .renameInput {
   box-sizing: border-box;
   width: 100%;

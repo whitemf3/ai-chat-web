@@ -1,10 +1,16 @@
 import clsx from 'clsx'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslate } from '../../i18n/index.js'
-import { IconPanelLeftOutline16, IconSettingsOutline16, NewChatIcon } from '../base/icons.js'
+import {
+  IconCheckOutline16,
+  IconCheckedOutline14,
+  IconPanelLeftOutline16,
+  IconSettingsOutline16,
+  NewChatIcon,
+} from '../base/icons.js'
 import { setSiderCollapsed } from '../../services/settings.js'
 import { groupSessions } from '../../services/chat/sessionGroups.js'
-import { newChat, removeSession, useChatStore } from '../../services/chat/store.js'
+import { newChat, removeSession, removeSessions, useChatStore } from '../../services/chat/store.js'
 import type { SessionSummary } from '../../services/chat/types.js'
 import { Button } from '../base/Button.js'
 import { IconButton } from '../base/IconButton.js'
@@ -24,6 +30,53 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
   const groups = useMemo(() => groupSessions(sessions, now, t), [sessions, now, t])
   const [deleting, setDeleting] = useState<SessionSummary | null>(null)
   const [deletePending, setDeletePending] = useState(false)
+  const [managing, setManaging] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [batchConfirm, setBatchConfirm] = useState(false)
+  const [batchDeleting, setBatchDeleting] = useState(false)
+
+  // 仅统计仍存在于列表中的选中项，删除后自动收敛
+  const selectedIds = sessions.filter((session) => selected.has(session.id)).map((session) => session.id)
+  const selectedCount = selectedIds.length
+  const allSelected = sessions.length > 0 && selectedCount === sessions.length
+
+  const toggleSelect = (id: string) =>
+    setSelected((previous) => {
+      const next = new Set(previous)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+
+  const toggleSelectAll = () =>
+    setSelected(allSelected ? new Set() : new Set(sessions.map((session) => session.id)))
+
+  const exitManaging = () => {
+    setManaging(false)
+    setSelected(new Set())
+  }
+
+  const confirmBatchDelete = async () => {
+    if (batchDeleting || selectedCount === 0) {
+      return
+    }
+    setBatchDeleting(true)
+    try {
+      const ok = await removeSessions(selectedIds)
+      setBatchConfirm(false)
+      if (ok) {
+        exitManaging()
+      } else {
+        showToast({ key: 'sessionDeleteFailed', type: 'error' })
+        setSelected(new Set())
+      }
+    } finally {
+      setBatchDeleting(false)
+    }
+  }
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>
@@ -53,27 +106,67 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
     <div className={clsx(styles.sider, mobile && styles.mobile)}>
       <div className={styles.top}>
         <div className={styles.appName}>{t('appName')}</div>
-        <IconButton
-          size="m"
-          icon={<IconPanelLeftOutline16 />}
-          tooltip={t('collapseSiderbarButton')}
-          tooltipPlacement="bottom"
-          onClick={() => (mobile ? closeMobileSider() : setSiderCollapsed(true))}
-        />
+        <div className={styles.topActions}>
+          {!managing && sessions.length > 0 ? (
+            <IconButton
+              size="m"
+              icon={<IconCheckedOutline14 />}
+              tooltip={t('batchManage')}
+              tooltipPlacement="bottom"
+              onClick={() => setManaging(true)}
+            />
+          ) : null}
+          <IconButton
+            size="m"
+            icon={<IconPanelLeftOutline16 />}
+            tooltip={t('collapseSiderbarButton')}
+            tooltipPlacement="bottom"
+            onClick={() => (mobile ? closeMobileSider() : setSiderCollapsed(true))}
+          />
+        </div>
       </div>
-      <button
-        type="button"
-        className={styles.newChat}
-        onClick={() => {
-          newChat()
-          closeMobileSider()
-        }}
-      >
-        <span className={styles.newChatIcon}>
-          <NewChatIcon />
-        </span>
-        {t('newChat')}
-      </button>
+      {managing ? (
+        <div className={styles.manageBar}>
+          <button
+            type="button"
+            className={styles.selectAll}
+            aria-pressed={allSelected}
+            onClick={toggleSelectAll}
+          >
+            <span className={clsx(styles.checkbox, allSelected && styles.checkboxChecked)} aria-hidden="true">
+              {allSelected ? <IconCheckOutline16 /> : null}
+            </span>
+            {t('selectAll')}
+          </button>
+          <div className={styles.manageActions}>
+            <Button
+              variant="dangerOutlined"
+              size="s"
+              disabled={selectedCount === 0 || batchDeleting}
+              onClick={() => setBatchConfirm(true)}
+            >
+              {selectedCount > 0 ? `${t('delete')}(${selectedCount})` : t('delete')}
+            </Button>
+            <Button variant="outlined" size="s" disabled={batchDeleting} onClick={exitManaging}>
+              {t('done')}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          className={styles.newChat}
+          onClick={() => {
+            newChat()
+            closeMobileSider()
+          }}
+        >
+          <span className={styles.newChatIcon}>
+            <NewChatIcon />
+          </span>
+          {t('newChat')}
+        </button>
+      )}
       <div className={styles.listWrap}>
         <div className={styles.list}>
           {groups.map((group) => (
@@ -84,6 +177,9 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
                   key={session.id}
                   session={session}
                   active={session.id === activeId}
+                  managing={managing}
+                  selected={selected.has(session.id)}
+                  onToggleSelect={() => toggleSelect(session.id)}
                   onDelete={() => setDeleting(session)}
                 />
               ))}
@@ -134,6 +230,28 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
           }
         >
           {t('deleteSessionWithFilesDescription')}
+        </Modal>
+      ) : null}
+      {batchConfirm ? (
+        <Modal
+          title={t('batchDeleteConfirmTitle')}
+          onClose={() => {
+            if (!batchDeleting) {
+              setBatchConfirm(false)
+            }
+          }}
+          footer={
+            <>
+              <Button variant="outlined" disabled={batchDeleting} onClick={() => setBatchConfirm(false)}>
+                {t('cancel')}
+              </Button>
+              <Button variant="danger" disabled={batchDeleting} onClick={() => void confirmBatchDelete()}>
+                {t('delete')}
+              </Button>
+            </>
+          }
+        >
+          {t('batchDeleteConfirmDescription', { count: selectedCount })}
         </Modal>
       ) : null}
     </div>

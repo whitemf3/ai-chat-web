@@ -193,4 +193,10 @@ export const en = {
   shareSession: 'Share',
   shareLinkCopied: 'Public link copied to clipboard, valid for 24 hours',
   shareFailed: 'Failed to share. Please try again',
+  batchManage: 'Batch manage',
+  selectAll: 'Select all',
+  done: 'Done',
+  batchDeleteConfirmTitle: 'Delete selected chats?',
+  batchDeleteConfirmDescription:
+    'The selected {count} chat(s) and their uploaded files will be permanently deleted and cannot be recovered. Delete them?',
 } satisfies Record<keyof typeof zh, string>
