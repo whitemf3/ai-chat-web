@@ -6,6 +6,7 @@ import { continueReply, regenerateReply } from '../../services/chat/store.js'
 import { resolveApiUrl } from '../../services/api/client.js'
 import type { AssistantMessage as AssistantMessageType } from '../../services/chat/types.js'
 import { IconButton } from '../base/IconButton.js'
+import { ImageLightbox } from '../base/ImageLightbox.js'
 import { Button } from '../base/Button.js'
 import { Markdown } from '../markdown/Markdown.js'
 import { CopyButton } from './CopyButton.js'
@@ -78,24 +79,12 @@ export const AssistantMessage = memo(function AssistantMessage({
         </div>
       ) : null}
       {zoomUrl ? (
-        <div
-          className={styles.lightbox}
-          role="dialog"
-          aria-label={t('generatedImageAlt')}
-          onClick={() => setZoomUrl(null)}
-        >
-          <img
-            className={styles.lightboxImage}
-            src={resolveApiUrl(zoomUrl)}
-            alt={t('generatedImageAlt')}
-            onClick={(event) => event.stopPropagation()}
-          />
-          <div className={styles.lightboxActions} onClick={(event) => event.stopPropagation()}>
-            <a className={styles.lightboxLink} href={`${resolveApiUrl(zoomUrl)}?download=1`}>
-              下载图片
-            </a>
-          </div>
-        </div>
+        <ImageLightbox
+          url={resolveApiUrl(zoomUrl)}
+          alt={t('generatedImageAlt')}
+          downloadUrl={`${resolveApiUrl(zoomUrl)}?download=1`}
+          onClose={() => setZoomUrl(null)}
+        />
       ) : null}
       {waiting ? (
         <div className={styles.waiting}>

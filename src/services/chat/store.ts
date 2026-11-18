@@ -839,12 +839,17 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
       controller.signal.throwIfAborted()
       const messages = toRequestMessages(prepared.history, prepared.question, prepared.prefix)
       const { thinking } = useSettings.getState()
+      // 带图对话强制关闭深度思考：全局开关可能从别的会话带过来。
+      const imagesPresent = [...prepared.history, prepared.question].some(
+        (message) => message.role === 'user' && message.files.some((file) => file.isImage)
+      )
+      const deepThink = imagesPresent ? false : (initial.thinking ?? thinking ?? false)
       const action = prepared.prefix ? 'continue' : prepared.regenerate ? 'generate' : 'messages'
       const events = streamMessage(
         sessionId,
         {
           messages,
-          deep_think: initial.thinking ?? thinking ?? false,
+          deep_think: deepThink,
           parent_id: prepared.history.at(-1)?.id ?? null,
           assistant_message_id: reply.id,
           generation_id: generationId,

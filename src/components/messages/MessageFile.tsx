@@ -6,6 +6,7 @@ import { resolveApiUrl } from '../../services/api/client.js'
 import { loadFile } from '../../services/chat/db.js'
 import type { FileAttachment } from '../../services/chat/types.js'
 import { IconPhotoErrorFill20, IconRefreshOutline16 } from '../base/icons.js'
+import { ImageLightbox } from '../base/ImageLightbox.js'
 import { Tooltip } from '../base/Tooltip.js'
 import { FileCard } from '../files/FileCard.js'
 import styles from './MessageFile.module.css'
@@ -57,8 +58,12 @@ export const MessageFile = ({
   onRetry: (() => void) | null
 }) => {
   const t = useTranslate()
-  const url = useFileUrl(file.id)
+  const localUrl = useFileUrl(file.id)
+  // 刷新或换设备后本地原件不在 IndexedDB，回退到服务端地址，缩略图与预览仍可用。
+  const remoteUrl = file.url ? resolveApiUrl(file.url) : null
+  const url = localUrl ?? remoteUrl
   const [failedUrl, setFailedUrl] = useState<string | null>(null)
+  const [zoomUrl, setZoomUrl] = useState<string | null>(null)
   const upload = useUploadState(file)
   const uploading = upload?.status === 'uploading'
   const failed = upload?.status === 'error'
@@ -135,17 +140,27 @@ export const MessageFile = ({
       )
     }
 
-    // 正常态：链接到原件
+    // 正常态：点击放大预览，预览内可下载原件
     return url ? (
-      <a
-        className={clsx(styles.image, styles.imageThumb)}
-        href={url}
-        target="_blank"
-        rel="noreferrer"
-        title={file.name}
-      >
-        {preview}
-      </a>
+      <>
+        <button
+          type="button"
+          className={clsx(styles.image, styles.imageThumb)}
+          title={file.name}
+          aria-label={t('previewImage')}
+          onClick={() => setZoomUrl(url)}
+        >
+          {preview}
+        </button>
+        {zoomUrl ? (
+          <ImageLightbox
+            url={zoomUrl}
+            alt={file.name}
+            downloadUrl={remoteUrl ?? undefined}
+            onClose={() => setZoomUrl(null)}
+          />
+        ) : null}
+      </>
     ) : (
       // 原件还没加载出来（极短暂）
       <div className={styles.image} />

@@ -44,6 +44,15 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
     (state) => sessionId !== null && Object.hasOwn(state.streaming, sessionId)
   )
   const thinking = useSettings((state) => state.thinking)
+  // 对话里出现图片（草稿或任意历史分支）时不允许深度思考：视觉链路与推理模型不兼容。
+  const sessionHasImages = useChatStore((state) => {
+    const session = sessionId === null ? undefined : state.sessionCache[sessionId]
+    return !!session?.messages.some(
+      (message) => message.role === 'user' && message.files.some((file) => file.isImage)
+    )
+  })
+  const imagesPresent = sessionHasImages || attachments.some((file) => file.isImage)
+  const thinkingOn = thinking && !imagesPresent
   const importingHistory = useChatStore((state) => state.importingHistory)
   const isMobile = useIsMobile()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -164,12 +173,13 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
       <div className={styles.functionRow}>
         {/* 深度思考开关，tooltip 在按钮上方 */}
         <div ref={togglesRef} className={styles.toggles}>
-          <Tooltip content={t('deactivatedThinkTooltip')}>
+          <Tooltip content={imagesPresent ? t('thinkingDisabledWithImages') : t('deactivatedThinkTooltip')}>
             <button
               type="button"
-              className={clsx(styles.toggle, thinking && styles.selected)}
+              className={clsx(styles.toggle, thinkingOn && styles.selected)}
               aria-label={t('thinkingSwitch')}
-              aria-pressed={thinking}
+              aria-pressed={thinkingOn}
+              disabled={imagesPresent}
               onClick={() => setThinking(!thinking)}
             >
               <IconThinkOutline14 />

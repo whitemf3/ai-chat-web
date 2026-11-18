@@ -235,6 +235,41 @@ test('R1 code truncated at EOF is immediately resumable without reloading or rep
   assert.equal(store.useChatStore.getState().sessionCache.s.messages.length, count)
 })
 
+test('reload restores attachment name and size instead of falling back to the type', async () => {
+  globalThis.fetch = async () => Response.json({ success: true, data: [
+    {
+      id: 'q1', role: 'user', content: '看这张图', created_at: '2026-11-17 00:00:00',
+      metadata: {
+        attachments: [{ type: 'image', url: '/api/files/u/f1.png', name: 'cat.png', size: 2048 }],
+        branch: { parentId: null, selectedRoot: true },
+      },
+    },
+  ] })
+  const session = await loadSession('s')
+  const file = session.messages[0].files[0]
+  assert.equal(file.name, 'cat.png')
+  assert.equal(file.size, 2048)
+  assert.equal(file.isImage, true)
+  assert.equal(file.url, '/api/files/u/f1.png')
+})
+
+test('image conversations force deep_think off even when the global switch is on', async () => {
+  const { setThinking } = await import('./src/services/settings.ts')
+  setThinking(true)
+  const calls = setupStore()
+  const session = store.useChatStore.getState().sessionCache.s
+  session.messages[0].files = [{
+    id: 'f1', serverId: '/api/files/u/f1.png', name: 'cat.png', size: 2048,
+    isImage: true, mimeType: 'image/png', url: '/api/files/u/f1.png',
+  }]
+  store.useChatStore.setState({ sessionCache: { s: session } })
+  store.regenerateReply('s', 'a1')
+  await idle()
+  const call = calls.find(call => call.path.endsWith('/generate'))
+  assert.equal(call.body.deep_think, false)
+  setThinking(false)
+})
+
 test('stop during typewriter playback cannot be overwritten by a queued finish', async () => {
   const calls = setupStore({ text: 'abcdefghijklmnopqrstuvwxyz'.repeat(4) })
   store.regenerateReply('s', 'a1')
