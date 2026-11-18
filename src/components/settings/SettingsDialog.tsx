@@ -1,6 +1,7 @@
 import clsx from 'clsx'
 import { useEffect, useState, type ReactNode } from 'react'
 import {
+  IconDataOutline16,
   IconDarkOutline16,
   IconFollowsystemOutline16,
   IconLightOutline16,
@@ -46,15 +47,16 @@ type QuotaData = {
 
 /**
  * 设置弹窗（对齐 DeepSeek chat-demo 结构：桌面居中弹窗 + 左侧图标导航）。
- * 分「通用设置」（主题、语言）与「账户」（资料、修改密码、登出）。
+ * 分「账户」（资料、今日额度）、「管理」（修改密码、登出）与「通用设置」（主题、语言）。
  */
 export const SettingsDialog = () => {
   const open = useSettingsDialog((state) => state.open)
   return open ? <SettingsContent /> : null
 }
 
-const sections: { value: SettingsSection | 'account'; label: string; icon: ReactNode }[] = [
+const sections: { value: SettingsSection | 'account' | 'management'; label: string; icon: ReactNode }[] = [
   { value: 'account', label: 'settingDialogAsideAccountOptionLabel', icon: <IconUserOutline16 /> },
+  { value: 'management', label: 'settingDialogAsideManagementOptionLabel', icon: <IconDataOutline16 /> },
   {
     value: 'general',
     label: 'settingDialogAsideGeneralOptionLabel',
@@ -63,8 +65,8 @@ const sections: { value: SettingsSection | 'account'; label: string; icon: React
 ]
 
 const SettingsContent = () => {
-  // 打开设置默认显示「账户」tab（今日额度 + 退出登录）
-  const [section, setSection] = useState<SettingsSection | 'account'>('account')
+  // 打开设置默认显示「账户」tab（今日额度 + 资料）
+  const [section, setSection] = useState<SettingsSection | 'account' | 'management'>('account')
   return (
     <Modal title="设置" closable className={styles.dialog} mainClassName={styles.dialogMain} onClose={closeSettings}>
       <div role="tablist" className={styles.navigation}>
@@ -88,6 +90,8 @@ const SettingsContent = () => {
             <ThemeSetting />
             <LocaleSetting />
           </>
+        ) : section === 'management' ? (
+          <ManagementPanel />
         ) : (
           <AccountPanel />
         )}
@@ -96,11 +100,12 @@ const SettingsContent = () => {
   )
 }
 
-/** TranslationKey 中新增的两个文案在 zh/en 里直接查表（本文件内联，避免动 i18n 聚合表） */
+/** TranslationKey 中新增的文案在 zh/en 里直接查表（本文件内联，避免动 i18n 聚合表） */
 const labelOf = (key: string): string => {
   const map: Record<string, string> = {
     settingDialogAsideGeneralOptionLabel: '通用设置',
     settingDialogAsideAccountOptionLabel: '账户',
+    settingDialogAsideManagementOptionLabel: '管理',
     avatarMenuSettingsDialogThemeItemLabel: '主题',
     avatarMenuSettingsDialogThemeSelectLightOption: '浅色',
     avatarMenuSettingsDialogThemeSelectDarkOption: '深色',
@@ -172,16 +177,11 @@ const LocaleSetting = () => {
 }
 
 // ============================================
-// 账户：资料 + 修改密码 + 登出
+// 账户：今日额度 + 资料
 // ============================================
 const AccountPanel = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [profileError, setProfileError] = useState(false)
-  const [oldPassword, setOldPassword] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [passwordStatus, setPasswordStatus] = useState<{ text: string; error: boolean } | null>(null)
-  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -213,44 +213,6 @@ const AccountPanel = () => {
       cancelled = true
     }
   }, [])
-
-  const changePassword = async () => {
-    if (saving) {
-      return
-    }
-    if (!oldPassword || !newPassword) {
-      setPasswordStatus({ text: '请填写当前密码与新密码', error: true })
-      return
-    }
-    if (newPassword !== confirmPassword) {
-      setPasswordStatus({ text: '两次输入的新密码不一致', error: true })
-      return
-    }
-    if (newPassword.length < 6) {
-      setPasswordStatus({ text: '新密码至少 6 位', error: true })
-      return
-    }
-    setSaving(true)
-    setPasswordStatus(null)
-    try {
-      await request('/api/user/password', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
-      })
-      setPasswordStatus({ text: '密码修改成功', error: false })
-      setOldPassword('')
-      setNewPassword('')
-      setConfirmPassword('')
-    } catch (error) {
-      setPasswordStatus({
-        text: error instanceof Error ? error.message : '修改失败',
-        error: true,
-      })
-    } finally {
-      setSaving(false)
-    }
-  }
 
   return (
     <>
@@ -308,6 +270,66 @@ const AccountPanel = () => {
         status={null}
         action={<span className={styles.profileValue}>{profile?.totalMessages ?? ''}</span>}
       />
+    </>
+  )
+}
+
+// ============================================
+// 管理：修改密码 + 登出
+// ============================================
+const ManagementPanel = () => {
+  const [oldPassword, setOldPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordStatus, setPasswordStatus] = useState<{ text: string; error: boolean } | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  const changePassword = async () => {
+    if (saving) {
+      return
+    }
+    if (!oldPassword || !newPassword) {
+      setPasswordStatus({ text: '请填写当前密码与新密码', error: true })
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordStatus({ text: '两次输入的新密码不一致', error: true })
+      return
+    }
+    if (newPassword.length < 6) {
+      setPasswordStatus({ text: '新密码至少 6 位', error: true })
+      return
+    }
+    setSaving(true)
+    setPasswordStatus(null)
+    try {
+      // 修改密码失败（如原密码错误、演示账号 403）只提示，不触发全局登出
+      await request(
+        '/api/user/password',
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ oldPassword, newPassword }),
+        },
+        30_000,
+        { logoutOnAuthError: false }
+      )
+      setPasswordStatus({ text: '密码修改成功', error: false })
+      setOldPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+    } catch (error) {
+      setPasswordStatus({
+        text: error instanceof Error ? error.message : '修改失败',
+        error: true,
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <>
       <div className={styles.passwordPanel}>
         <div className={styles.passwordTitle}>修改密码</div>
         <input

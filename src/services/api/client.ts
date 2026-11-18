@@ -96,8 +96,13 @@ const readErrorResponse = async (
   return new ApiError(kind, message, response.status)
 }
 
-/** 统一鉴权请求：401/403 时登出（banned/expired） */
-export const request = async (path: string, init: RequestInit, timeoutMs = 30_000): Promise<Response> => {
+/** 统一鉴权请求：401/403 时登出（banned/expired）；logoutOnAuthError=false 时仅抛错不登出 */
+export const request = async (
+  path: string,
+  init: RequestInit,
+  timeoutMs = 30_000,
+  { logoutOnAuthError = true }: { logoutOnAuthError?: boolean } = {}
+): Promise<Response> => {
   const token = getToken()
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(new Error('Request timed out')), timeoutMs)
@@ -114,7 +119,9 @@ export const request = async (path: string, init: RequestInit, timeoutMs = 30_00
       }
     )
     if (response.status === 401 || response.status === 403) {
-      logout()
+      if (logoutOnAuthError) {
+        logout()
+      }
       throw await readErrorResponse(response)
     }
     if (!response.ok) {
